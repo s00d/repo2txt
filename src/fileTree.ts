@@ -59,7 +59,8 @@ class FileTreeScanner {
 					const cachedSize = cachedStat.size;
 					stats = {
 						isDirectory: () => cachedStat.isDirectory,
-						size: typeof cachedSize === "bigint" ? cachedSize : (cachedSize ?? 0),
+						size:
+							typeof cachedSize === "bigint" ? cachedSize : (cachedSize ?? 0),
 						mtime: cachedStat.mtime ?? new Date(),
 					} as Awaited<ReturnType<typeof stat>>;
 				} else {
@@ -77,9 +78,7 @@ class FileTreeScanner {
 						name: entry,
 						path: relPath,
 						isDirectory: true,
-						children: recursive
-							? await this.scan(fullPath, relPath, true)
-							: [],
+						children: recursive ? await this.scan(fullPath, relPath, true) : [],
 					};
 					nodes.push(node);
 				} else {
@@ -88,7 +87,8 @@ class FileTreeScanner {
 						path: relPath,
 						isDirectory: false,
 						children: [],
-						size: typeof stats.size === "bigint" ? Number(stats.size) : stats.size,
+						size:
+							typeof stats.size === "bigint" ? Number(stats.size) : stats.size,
 						mtime: stats.mtime,
 					};
 					nodes.push(node);
@@ -204,11 +204,11 @@ export function getTreeStructure(
 	const lines: string[] = [];
 
 	// Helper function that checks if directory contains selected elements
-		function hasSelectedDescendants(node: FileNode): boolean {
-			if (!node.isDirectory) {
-				return false;
-			}
-			// Use .some() for efficiency - stops at first found
+	function hasSelectedDescendants(node: FileNode): boolean {
+		if (!node.isDirectory) {
+			return false;
+		}
+		// Use .some() for efficiency - stops at first found
 		return node.children.some((child) => {
 			const childState = uiState.get(child.path);
 			return (childState?.selected ?? false) || hasSelectedDescendants(child);
@@ -220,9 +220,7 @@ export function getTreeStructure(
 		const visibleNodes = nodes.filter((node) => {
 			const state = uiState.get(node.path);
 			const isSelected = state?.selected ?? false;
-			return (
-				isSelected || (node.isDirectory && hasSelectedDescendants(node))
-			);
+			return isSelected || (node.isDirectory && hasSelectedDescendants(node));
 		});
 
 		// 2. Iterate over already FILTERED list.

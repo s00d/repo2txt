@@ -74,7 +74,6 @@ export function getLanguageByExtension(filePath: string): string {
 	return languageMap[ext] || "text";
 }
 
-
 /**
  * Recursively updates UI state for all nodes (including newly scanned)
  */
@@ -144,7 +143,8 @@ export async function prepareMarkdownData(
 function formatFileSize(bytes: number): string {
 	if (bytes < 1024) return `${bytes} B`;
 	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
-	if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+	if (bytes < 1024 * 1024 * 1024)
+		return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 	return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
@@ -199,7 +199,7 @@ export async function writeMarkdown(
 					reject(streamError);
 					return;
 				}
-				
+
 				const canContinue = stream.write(data);
 				if (canContinue) {
 					resolve();
@@ -234,14 +234,16 @@ export async function writeMarkdown(
 	for (let i = 0; i < selectedFiles.length; i++) {
 		const filePath = selectedFiles[i];
 		const fullPath = path.join(rootPath, filePath);
-		
+
 		// Output information about current file being processed
-		const progressMessage = chalk.blue(`📝 Processing [${i + 1}/${totalFiles}]: `) + chalk.cyan(filePath);
+		const progressMessage =
+			chalk.blue(`📝 Processing [${i + 1}/${totalFiles}]: `) +
+			chalk.cyan(filePath);
 		// Output on same line with overwrite (without ANSI codes for length calculation)
 		const plainMessage = `📝 Processing [${i + 1}/${totalFiles}]: ${filePath}`;
 		const padding = Math.max(0, 100 - plainMessage.length);
 		process.stdout.write(`\r${progressMessage}${" ".repeat(padding)}`);
-		
+
 		try {
 			const fileContent = await readFile(fullPath, "utf-8");
 			const language = getLanguageByExtension(filePath);
@@ -250,7 +252,10 @@ export async function writeMarkdown(
 			// Calculate statistics
 			fileCount++;
 			const fileStats = await stat(fullPath);
-			totalSize += typeof fileStats.size === "bigint" ? Number(fileStats.size) : fileStats.size;
+			totalSize +=
+				typeof fileStats.size === "bigint"
+					? Number(fileStats.size)
+					: fileStats.size;
 			totalTokens += encode(fileContent).length;
 
 			await writeToStream(`## ${filePath}\n\n`);
@@ -264,7 +269,7 @@ export async function writeMarkdown(
 			await writeToStream("---\n\n");
 		}
 	}
-	
+
 	// Clear progress line
 	process.stdout.write("\r" + " ".repeat(80) + "\r");
 
@@ -275,20 +280,22 @@ export async function writeMarkdown(
 	};
 
 	if (stream) {
-		return new Promise<{ content: string; stats: GenerationStats }>((resolve, reject) => {
-			if (streamError) {
-				reject(streamError);
-				return;
-			}
-			
-			stream.end(() => {
+		return new Promise<{ content: string; stats: GenerationStats }>(
+			(resolve, reject) => {
 				if (streamError) {
 					reject(streamError);
-				} else {
-					resolve({ content, stats });
+					return;
 				}
-			});
-		});
+
+				stream.end(() => {
+					if (streamError) {
+						reject(streamError);
+					} else {
+						resolve({ content, stats });
+					}
+				});
+			},
+		);
 	}
 
 	return { content, stats };
@@ -305,9 +312,14 @@ export async function generateMarkdown(
 	uiState: Map<string, UIState>,
 	gitignoreContent?: string,
 ): Promise<string> {
-	const data = await prepareMarkdownData(nodes, rootPath, uiState, gitignoreContent);
+	const data = await prepareMarkdownData(
+		nodes,
+		rootPath,
+		uiState,
+		gitignoreContent,
+	);
 	const result = await writeMarkdown(data, rootPath, outputPath);
-	
+
 	// Output statistics to console
 	const sizeStr = formatFileSize(result.stats.size);
 	const tokenStr = formatTokenCount(result.stats.tokens);
@@ -315,6 +327,6 @@ export async function generateMarkdown(
 	console.log(chalk.white(`   Files: ${chalk.green(result.stats.files)}`));
 	console.log(chalk.white(`   Size: ${chalk.yellow(sizeStr)}`));
 	console.log(chalk.white(`   Tokens: ${chalk.magenta(tokenStr)}`));
-	
+
 	return result.content;
 }

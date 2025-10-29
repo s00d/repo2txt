@@ -19,7 +19,10 @@ export class UIStateController extends EventEmitter {
 	 * Initializes UI state based on .gitignore
 	 */
 	public initialize(nodes: FileNode[]): void {
-		this.uiState = this.createUIStateFromGitignore(nodes, this.gitignoreContent);
+		this.uiState = this.createUIStateFromGitignore(
+			nodes,
+			this.gitignoreContent,
+		);
 		this.emit("state-changed");
 	}
 

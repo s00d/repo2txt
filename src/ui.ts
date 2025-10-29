@@ -219,16 +219,16 @@ export class FileTreeUI extends EventEmitter {
 		if (tokens === 0) {
 			return "";
 		}
-		
+
 		if (tokens < 1000) {
 			return `, ~${tokens} tokens`;
 		}
-		
+
 		if (tokens < 1_000_000) {
 			const kTokens = (tokens / 1000).toFixed(1);
 			return `, ~${kTokens}k tokens`;
 		}
-		
+
 		const mTokens = (tokens / 1_000_000).toFixed(2);
 		return `, ~${mTokens}M tokens`;
 	}
@@ -361,7 +361,7 @@ export class FileTreeUI extends EventEmitter {
 			// Подсчитываем токены для этого файла
 			const filePath = node.path;
 			let tokenCount: number | null = null;
-			
+
 			if (this.tokenCache.has(filePath)) {
 				tokenCount = this.tokenCache.get(filePath) || 0;
 			} else {
@@ -397,7 +397,7 @@ export class FileTreeUI extends EventEmitter {
 					const lines = fileContent.split("\n").slice(0, 20);
 					content += `{gray-fg}─{/gray-fg}\n`; // Separator
 					content += `{bold}{cyan-fg}Preview:{/cyan-fg}{/bold}\n`;
-					const previewLines = lines.map(line => `${line}\n`).join("");
+					const previewLines = lines.map((line) => `${line}\n`).join("");
 					content += `{gray-fg}${previewLines}${lines.length === 20 ? "... (showing first 20 lines)\n" : ""}{/gray-fg}`;
 				} catch {
 					content += `{gray-fg}─{/gray-fg}\n`;
@@ -409,8 +409,6 @@ export class FileTreeUI extends EventEmitter {
 		this.infoPanel.setContent(content);
 		this.screen.render();
 	}
-
-
 
 	private enterSearchMode(): void {
 		this.isSearchMode = true;
@@ -539,17 +537,16 @@ export class FileTreeUI extends EventEmitter {
 		if (!item) return;
 
 		const node = item.node;
-		if (!node.isDirectory || this.stateController.isExpanded(node.path) === expand) {
+		if (
+			!node.isDirectory ||
+			this.stateController.isExpanded(node.path) === expand
+		) {
 			return;
 		}
 
 		if (expand && node.children.length === 0) {
 			// Сканируем директорию
-			await scanDirectoryNode(
-				this.rootPath,
-				node,
-				this.gitignoreContent,
-			);
+			await scanDirectoryNode(this.rootPath, node, this.gitignoreContent);
 			// После сканирования нужно обновить состояние для новых детей
 			this.stateController.syncUIStateForChildren(node.children);
 		}
@@ -623,7 +620,10 @@ export class FileTreeUI extends EventEmitter {
 		});
 	}
 
-	public show(): Promise<{ nodes: FileNode[]; uiState: Map<string, UIState> } | null> {
+	public show(): Promise<{
+		nodes: FileNode[];
+		uiState: Map<string, UIState>;
+	} | null> {
 		return new Promise((resolve) => {
 			this.once(
 				"selection-complete",

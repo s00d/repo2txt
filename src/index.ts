@@ -55,13 +55,13 @@ Hotkeys:
 		exclude: {
 			type: "string",
 			alias: "e",
-			description:
-				"Additional exclusion patterns (can be used multiple times)",
+			description: "Additional exclusion patterns (can be used multiple times)",
 		},
 		"skip-ui": {
 			type: "boolean",
 			alias: "s",
-			description: "Skip file selection UI and generate markdown directly with default selected files",
+			description:
+				"Skip file selection UI and generate markdown directly with default selected files",
 			default: false,
 		},
 		clipboard: {
@@ -77,7 +77,6 @@ Hotkeys:
 		},
 	},
 	async run({ args }) {
-
 		const targetDir = path.resolve(args.directory || process.cwd());
 		const outputPath = path.resolve(args.output || "output.md");
 		const ignoreGitignore = args["ignore-gitignore"] || false;
@@ -91,9 +90,7 @@ Hotkeys:
 		try {
 			const stats = await stat(targetDir);
 			if (!stats?.isDirectory()) {
-				console.error(
-					chalk.red(`Error: ${targetDir} is not a directory`),
-				);
+				console.error(chalk.red(`Error: ${targetDir} is not a directory`));
 				process.exit(1);
 			}
 		} catch (error: unknown) {
@@ -130,9 +127,7 @@ Hotkeys:
 						process.exit(1);
 					}
 				} else {
-					console.error(
-						chalk.red(`Error: File .repo2txtrc.json not found`),
-					);
+					console.error(chalk.red(`Error: File .repo2txtrc.json not found`));
 					process.exit(1);
 				}
 			} catch (error: unknown) {
@@ -198,9 +193,7 @@ Hotkeys:
 
 			if (useClipboard) {
 				await clipboardy.write(markdownContent);
-				console.log(
-					chalk.green(`\n✅ Done! Result copied to clipboard`),
-				);
+				console.log(chalk.green(`\n✅ Done! Result copied to clipboard`));
 			} else {
 				console.log(
 					chalk.green(`\n✅ Done! File saved: ${chalk.cyan(outputPath)}`),
@@ -219,9 +212,7 @@ Hotkeys:
 		}
 
 		console.log(
-			chalk.blue(
-				"\n📝 Generating markdown file... (this may take some time)",
-			),
+			chalk.blue("\n📝 Generating markdown file... (this may take some time)"),
 		);
 
 		const useClipboard = args.clipboard || false;
@@ -237,9 +228,7 @@ Hotkeys:
 
 		if (useClipboard) {
 			await clipboardy.write(markdownContent);
-			console.log(
-				chalk.green(`\n✅ Done! Result copied to clipboard`),
-			);
+			console.log(chalk.green(`\n✅ Done! Result copied to clipboard`));
 		} else {
 			console.log(
 				chalk.green(`\n✅ Done! File saved: ${chalk.cyan(outputPath)}`),
@@ -248,7 +237,6 @@ Hotkeys:
 		process.exit(0);
 	},
 });
-
 
 // Public API exports
 export type { FileNode } from "./types.js";
@@ -268,4 +256,3 @@ export {
 	writeMarkdown,
 	type MarkdownData,
 } from "./generator.js";
-
