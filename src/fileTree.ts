@@ -137,6 +137,40 @@ function isBinaryFile(filename: string): boolean {
 }
 
 /**
+ * Private file patterns that should always be excluded (secrets, credentials, etc.)
+ */
+const PRIVATE_FILE_PATTERNS = [
+	/^\.env$/,
+	/^\.env\./,
+	/\.secret$/,
+	/\.key$/,
+	/\.pem$/,
+	/\.p12$/,
+	/\.pfx$/,
+	/\.crt$/,
+	/\.cer$/,
+	/\.der$/,
+	/\.jks$/,
+	/\.keystore$/,
+	/\.private$/,
+	/\.credentials$/,
+	/id_rsa$/,
+	/id_dsa$/,
+	/id_ecdsa$/,
+	/id_ed25519$/,
+	/config\.local/,
+	/secrets/,
+];
+
+/**
+ * Checks if file is a private/secret file that should be excluded
+ */
+function isPrivateFile(filename: string): boolean {
+	const lowerName = filename.toLowerCase();
+	return PRIVATE_FILE_PATTERNS.some((pattern) => pattern.test(lowerName));
+}
+
+/**
  * Class for scanning file tree with .gitignore logic encapsulation
  */
 class FileTreeScanner {
@@ -208,6 +242,11 @@ class FileTreeScanner {
 				} else {
 					// Exclude binary files (images, videos, archives, etc.)
 					if (isBinaryFile(entry)) {
+						continue;
+					}
+
+					// Exclude private files (secrets, credentials, env files, etc.)
+					if (isPrivateFile(entry)) {
 						continue;
 					}
 
