@@ -18,6 +18,17 @@ interface StatCache {
 const statCache = new Map<string, StatCache>();
 
 /**
+ * System directories and files that should always be excluded
+ */
+const SYSTEM_EXCLUDES = new Set([
+	".git",
+	".svn",
+	".hg",
+	".DS_Store",
+	"Thumbs.db",
+]);
+
+/**
  * Class for scanning file tree with .gitignore logic encapsulation
  */
 class FileTreeScanner {
@@ -47,6 +58,11 @@ class FileTreeScanner {
 			const entries = await readdir(dirPath);
 
 			for (const entry of entries) {
+				// Always exclude system directories and files
+				if (SYSTEM_EXCLUDES.has(entry)) {
+					continue;
+				}
+
 				const fullPath = path.join(dirPath, entry);
 				const relPath = path.join(relativePath, entry);
 
