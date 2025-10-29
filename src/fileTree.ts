@@ -26,6 +26,18 @@ const SYSTEM_EXCLUDES = new Set([
 	".hg",
 	".DS_Store",
 	"Thumbs.db",
+	"node_modules",
+	"dist",
+	"build",
+	".next",
+	".cache",
+	".vite",
+	".turbo",
+	"coverage",
+	".nyc_output",
+	".idea",
+	".vscode",
+	".vs",
 ]);
 
 /**
