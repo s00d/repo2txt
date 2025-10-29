@@ -41,6 +41,102 @@ const SYSTEM_EXCLUDES = new Set([
 ]);
 
 /**
+ * Binary file extensions that should always be excluded
+ */
+const BINARY_EXTENSIONS = new Set([
+	// Images
+	".jpg",
+	".jpeg",
+	".png",
+	".gif",
+	".bmp",
+	".svg",
+	".webp",
+	".ico",
+	".tiff",
+	".tif",
+	".psd",
+	".ai",
+	".eps",
+	".raw",
+	".cr2",
+	".nef",
+	".orf",
+	".sr2",
+	".heic",
+	".heif",
+	".avif",
+	// Videos
+	".mp4",
+	".avi",
+	".mov",
+	".wmv",
+	".flv",
+	".webm",
+	".mkv",
+	".m4v",
+	".3gp",
+	".mpg",
+	".mpeg",
+	".vob",
+	".ogv",
+	".mts",
+	".m2ts",
+	// Audio
+	".mp3",
+	".wav",
+	".flac",
+	".aac",
+	".ogg",
+	".wma",
+	".m4a",
+	".opus",
+	".amr",
+	".aiff",
+	// Archives
+	".zip",
+	".rar",
+	".7z",
+	".tar",
+	".gz",
+	".bz2",
+	".xz",
+	".cab",
+	".deb",
+	".rpm",
+	".dmg",
+	".iso",
+	".apk",
+	".exe",
+	".msi",
+	// Fonts
+	".ttf",
+	".otf",
+	".woff",
+	".woff2",
+	".eot",
+	// Documents (binary formats)
+	".pdf",
+	".doc",
+	".docx",
+	".xls",
+	".xlsx",
+	".ppt",
+	".pptx",
+	".odt",
+	".ods",
+	".odp",
+]);
+
+/**
+ * Checks if file should be excluded based on its extension
+ */
+function isBinaryFile(filename: string): boolean {
+	const ext = path.extname(filename).toLowerCase();
+	return BINARY_EXTENSIONS.has(ext);
+}
+
+/**
  * Class for scanning file tree with .gitignore logic encapsulation
  */
 class FileTreeScanner {
@@ -110,6 +206,11 @@ class FileTreeScanner {
 					};
 					nodes.push(node);
 				} else {
+					// Exclude binary files (images, videos, archives, etc.)
+					if (isBinaryFile(entry)) {
+						continue;
+					}
+
 					const node: FileNode = {
 						name: entry,
 						path: relPath,
