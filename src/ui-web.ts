@@ -350,6 +350,12 @@ export async function startWebServer(
 			// Catch-all route for SPA - must be last
 			// This only fires if static middleware didn't find a file (404)
 			const indexPath = path.resolve(staticPath, "index.html");
+			// Log for debugging
+			if (!existsSync(indexPath)) {
+				console.error(`WARNING: index.html not found at: ${indexPath}`);
+				console.error(`Static path: ${staticPath}`);
+				console.error(`__dirname: ${__dirname}`);
+			}
 			app.use((req, res, next) => {
 				// Only handle GET requests that aren't API routes
 				if (req.method !== "GET" || req.path.startsWith("/api")) {
@@ -359,17 +365,17 @@ export async function startWebServer(
 				if (existsSync(indexPath)) {
 					// Only send if response hasn't been sent yet
 					if (!res.headersSent) {
-						res.sendFile(indexPath, (err) => {
+						// sendFile with root option is the correct way for SPA routing
+						res.sendFile("index.html", { root: staticPath }, (err) => {
 							if (err && !res.headersSent) {
-								console.error("Failed to send index.html:", err);
+								console.error(`Failed to send index.html from ${staticPath}:`, err);
 								next(err);
 							}
 						});
 					}
 				} else {
 					if (!res.headersSent) {
-						console.error(`index.html not found at: ${indexPath}`);
-						res.status(404).send("Not Found");
+						res.status(404).send(`Not Found: index.html not found at ${indexPath}`);
 					}
 				}
 			});
@@ -386,9 +392,14 @@ export async function startWebServer(
 		// Serve static files - let 404 fall through to catch-all route
 		app.use(express.static(staticPath, { fallthrough: true }));
 		// Catch-all route for SPA - must be last
-		// Use named wildcard parameter for Express 5 compatibility
 		// This only fires if static middleware didn't find a file (404)
 		const indexPath = path.resolve(staticPath, "index.html");
+		// Log for debugging
+		if (!existsSync(indexPath)) {
+			console.error(`WARNING: index.html not found at: ${indexPath}`);
+			console.error(`Static path: ${staticPath}`);
+			console.error(`__dirname: ${__dirname}`);
+		}
 		app.use((req, res, next) => {
 			// Only handle GET requests that aren't API routes
 			if (req.method !== "GET" || req.path.startsWith("/api")) {
@@ -398,17 +409,18 @@ export async function startWebServer(
 			if (existsSync(indexPath)) {
 				// Only send if response hasn't been sent yet
 				if (!res.headersSent) {
-					res.sendFile(indexPath, (err) => {
+					// sendFile requires an absolute path, and the path must be within the static directory
+					// For SPA routing, always send index.html
+					res.sendFile("index.html", { root: staticPath }, (err) => {
 						if (err && !res.headersSent) {
-							console.error("Failed to send index.html:", err);
+							console.error(`Failed to send index.html from ${staticPath}:`, err);
 							next(err);
 						}
 					});
 				}
 			} else {
 				if (!res.headersSent) {
-					console.error(`index.html not found at: ${indexPath}`);
-					res.status(404).send("Not Found");
+					res.status(404).send(`Not Found: index.html not found at ${indexPath}`);
 				}
 			}
 		});
