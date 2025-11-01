@@ -1,9 +1,9 @@
 import express from "express";
-import open from "open";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { readFile, stat } from "fs/promises";
 import { existsSync } from "fs";
+import { spawn, type ChildProcess } from "child_process";
 import { buildFileTree, scanDirectoryNode, getSelectedFiles } from "./fileTree.js";
 import { generateMarkdown, getLanguageByExtension } from "./generator.js";
 import { UIStateController } from "./uiStateController.js";
@@ -62,6 +62,7 @@ export async function startWebServer(
 	port: number = 8765,
 ): Promise<void> {
 	const app = express();
+	let electronProcess: ChildProcess | null = null;
 	// Check if production build exists - if so, use it
 	// Otherwise, try to use Vite dev server (only if vite is available)
 	const distWebPath = path.join(__dirname, "../dist/web");
@@ -315,6 +316,9 @@ export async function startWebServer(
 	app.post("/api/shutdown", (_req, res) => {
 		res.json({ success: true, message: "Server shutting down" });
 		setTimeout(() => {
+			if (electronProcess && !electronProcess.killed) {
+				electronProcess.kill();
+			}
 			process.exit(0);
 		}, 500);
 	});
@@ -427,12 +431,96 @@ export async function startWebServer(
 	}
 
 	// Start server
-	app.listen(port, () => {
+	app.listen(port, async () => {
 		const url = `http://localhost:${port}`;
 		console.log(`Server running on ${url}`);
-		open(url).catch((error) => {
-			console.error("Failed to open browser:", error);
-		});
+		
+		try {
+			// Find electron binary
+			const electronPath = path.join(__dirname, "../node_modules/.bin/electron");
+			let electronExecutable: string;
+			
+			if (existsSync(electronPath)) {
+				electronExecutable = electronPath;
+			} else {
+				// Try alternative paths
+				const altPath = path.join(__dirname, "../node_modules/electron/cli.js");
+				if (existsSync(altPath)) {
+					electronExecutable = process.execPath;
+					// Will use node to run cli.js
+				} else {
+					throw new Error("Electron binary not found. Make sure electron is installed.");
+				}
+			}
+			
+			// Create a simple Electron main script
+			const electronMainScript = `
+const { app, BrowserWindow } = require('electron');
+const url = '${url}';
+
+function createWindow() {
+  const win = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    title: 'repo2txt',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+  
+  win.loadURL(url);
+  
+  win.on('closed', () => {
+    process.exit(0);
+  });
+}
+
+app.whenReady().then(createWindow);
+
+app.on('window-all-closed', () => {
+  process.exit(0);
+});
+`;
+			
+			const scriptPath = path.join(__dirname, "../tmp/electron-main.cjs");
+			const scriptDir = path.dirname(scriptPath);
+			if (!existsSync(scriptDir)) {
+				const { mkdir } = await import("fs/promises");
+				await mkdir(scriptDir, { recursive: true });
+			}
+			await import("fs/promises").then(({ writeFile }) => writeFile(scriptPath, electronMainScript));
+			
+			// Spawn electron process
+			electronProcess = spawn(electronExecutable, [scriptPath], {
+				stdio: "inherit",
+				cwd: path.join(__dirname, ".."),
+			});
+			
+			// When electron exits, exit the program
+			electronProcess.on("exit", (code) => {
+				electronProcess = null;
+				process.exit(code || 0);
+			});
+			
+			electronProcess.on("error", (error) => {
+				console.error("Failed to start electron:", error);
+			});
+		} catch (error) {
+			console.error("Failed to start electron:", error);
+			console.error("Make sure electron package is installed: pnpm install electron");
+		}
 	});
+	
+	// Handle process termination signals
+	const shutdown = () => {
+		if (electronProcess && !electronProcess.killed) {
+			electronProcess.kill();
+		}
+		process.exit(0);
+	};
+	
+	process.on("SIGINT", shutdown);
+	process.on("SIGTERM", shutdown);
 }
 

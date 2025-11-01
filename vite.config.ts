@@ -69,7 +69,7 @@ export default defineConfig(({ command }) => {
 					"clipboardy",
 					"gpt-tokenizer",
 					"express",
-					"open",
+					"electron",
 					"vite",
 				],
 				output: {
