@@ -1,5 +1,4 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import open from "open";
 import * as path from "path";
 import { fileURLToPath } from "url";
@@ -63,7 +62,11 @@ export async function startWebServer(
 	port: number = 8765,
 ): Promise<void> {
 	const app = express();
-	const isProduction = process.env.NODE_ENV === "production";
+	// Check if production build exists - if so, use it
+	// Otherwise, try to use Vite dev server (only if vite is available)
+	const distWebPath = path.join(__dirname, "../dist/web");
+	const hasProductionBuild = existsSync(distWebPath) && existsSync(path.join(distWebPath, "index.html"));
+	const isProduction = process.env.NODE_ENV === "production" || hasProductionBuild;
 
 	// Middleware
 	app.use(express.json());
@@ -319,15 +322,35 @@ export async function startWebServer(
 	// Setup Vite in development or serve static files in production
 	// Must be after API routes to avoid conflicts
 	if (!isProduction) {
-		// Ensure BUILD_WEB is set for Vite config
-		process.env.BUILD_WEB = "true";
-		const vite = await createViteServer({
-			server: { middlewareMode: true },
-			root: path.join(__dirname, "../web"),
-			appType: "spa",
-			configFile: path.join(__dirname, "../vite.config.ts"),
-		});
-		app.use(vite.middlewares);
+		// Development: use Vite dev server (dynamic import to avoid requiring vite in production)
+		try {
+			const { createServer } = await import("vite");
+			process.env.BUILD_WEB = "true";
+			const vite = await createServer({
+				server: { middlewareMode: true },
+				root: path.join(__dirname, "../web"),
+				appType: "spa",
+				configFile: path.join(__dirname, "../vite.config.ts"),
+			});
+			app.use(vite.middlewares);
+		} catch (error) {
+			console.error(
+				"Failed to start Vite dev server. Make sure vite is installed:",
+				error instanceof Error ? error.message : String(error),
+			);
+			console.error(
+				"In production, use built files. Run 'npm run build' to build web UI.",
+			);
+			// Fallback to static files if vite is not available
+			const staticPath = existsSync(path.join(__dirname, "../dist/web"))
+				? path.join(__dirname, "../dist/web")
+				: path.join(__dirname, "../web");
+			app.use(express.static(staticPath));
+			// Catch-all route for SPA - must be last
+			app.get("/*", (_req, res) => {
+				res.sendFile(path.join(staticPath, "index.html"));
+			});
+		}
 	} else {
 		// Production: serve static files
 		const staticPath = path.join(__dirname, "../dist/web");
@@ -338,7 +361,8 @@ export async function startWebServer(
 			process.exit(1);
 		}
 		app.use(express.static(staticPath));
-		app.get("*", (_req, res) => {
+		// Catch-all route for SPA - must be last
+		app.get("/*", (_req, res) => {
 			res.sendFile(path.join(staticPath, "index.html"));
 		});
 	}
