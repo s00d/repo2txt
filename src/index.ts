@@ -25,7 +25,6 @@ Hotkeys:
 
   Selection:
     Space        - Select/deselect file or folder
-    Double click - Select/deselect
 
   Actions:
     Enter        - Apply selection and generate Markdown

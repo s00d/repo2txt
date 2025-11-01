@@ -67,7 +67,7 @@ export class FileTreeUI extends EventEmitter {
 			height: "100%",
 			keys: true,
 			vi: true,
-			mouse: true,
+			mouse: false,
 			scrollable: true,
 			alwaysScroll: false,
 			tags: true,
@@ -98,12 +98,6 @@ export class FileTreeUI extends EventEmitter {
 				type: "line",
 			},
 			items: [],
-		});
-
-		// Обработка клика мыши
-		this.list.on("element click", (_el, _mouse) => {
-			const currentIndex = this.getSelectedIndex();
-			this.toggleSelection(currentIndex);
 		});
 
 		// Информационная панель (справа, 40% ширины)
