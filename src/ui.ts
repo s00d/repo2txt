@@ -1,5 +1,4 @@
 import blessed from "blessed";
-import chalk from "chalk";
 import { EventEmitter } from "events";
 import { readFile } from "fs/promises";
 import * as path from "path";
@@ -31,6 +30,7 @@ export class FileTreeUI extends EventEmitter {
 		nodes: FileNode[],
 		rootPath: string,
 		gitignoreContent: string = "",
+		savedState?: Map<string, UIState>,
 	) {
 		super();
 		this.nodes = nodes;
@@ -40,6 +40,13 @@ export class FileTreeUI extends EventEmitter {
 		// Создаем контроллер состояния
 		this.stateController = new UIStateController(gitignoreContent);
 		this.stateController.initialize(nodes);
+
+		// Load saved state if provided
+		if (savedState) {
+			this.stateController.loadState(savedState, nodes);
+			// Recursively expand directories that were expanded in saved state
+			void this.expandSavedDirectories(nodes, savedState);
+		}
 
 		// Подписываемся на изменения состояния
 		this.stateController.on("state-changed", () => {
@@ -62,13 +69,14 @@ export class FileTreeUI extends EventEmitter {
 			vi: true,
 			mouse: true,
 			scrollable: true,
-			alwaysScroll: true,
+			alwaysScroll: false,
 			tags: true,
 			style: {
 				selected: {
 					bg: "cyan",
 					fg: "black",
 					bold: true,
+					underline: true,
 				},
 				item: {
 					fg: "white",
@@ -79,6 +87,12 @@ export class FileTreeUI extends EventEmitter {
 				border: {
 					fg: "green",
 				},
+			},
+			padding: {
+				left: 1,
+				right: 1,
+				top: 0,
+				bottom: 0,
 			},
 			border: {
 				type: "line",
@@ -279,16 +293,16 @@ export class FileTreeUI extends EventEmitter {
 
 			const isSelected = this.stateController.isSelected(node.path);
 			const marker = isSelected
-				? "{green-fg}☑{/green-fg}"
-				: "{gray-fg}☐{/gray-fg}";
+				? "{green-fg}[✓]{/green-fg}"
+				: "{gray-fg}[ ]{/gray-fg}";
 
 			let iconAndName: string;
 			if (node.isDirectory) {
 				const isExpanded = this.stateController.isExpanded(node.path);
-				const icon = isExpanded ? "📂" : "📁";
-				iconAndName = `{cyan-fg}${icon} {bold}${node.name}{/bold}{/cyan-fg}`;
+				const icon = isExpanded ? "▼" : "▶";
+				iconAndName = `{cyan-fg} ${icon} {bold}${node.name}{/bold}{/cyan-fg}`;
 			} else {
-				iconAndName = `{yellow-fg}📄 ${node.name}{/yellow-fg}`;
+				iconAndName = `{yellow-fg}{bold}${node.name}{/bold}{/yellow-fg}`;
 				const size = this.formatFileSize(node.size);
 				const date = this.formatDate(node.mtime);
 				const metadata = [size, date].filter(Boolean).join(" • ");
@@ -297,7 +311,7 @@ export class FileTreeUI extends EventEmitter {
 				}
 			}
 
-			const line = `${prefix}${treePrefix}${marker} ${iconAndName}`;
+			const line = ` ${prefix}${treePrefix}${marker}${iconAndName}`;
 			this.flatList.push({ node, line });
 
 			// Показываем детей, если папка раскрыта или идет поиск
@@ -562,6 +576,35 @@ export class FileTreeUI extends EventEmitter {
 
 	private collapseNode(index: number): void {
 		void this.toggleNodeExpansion(index, false);
+	}
+
+	/**
+	 * Recursively expands directories that were expanded in saved state
+	 */
+	private async expandSavedDirectories(
+		nodes: FileNode[],
+		savedState: Map<string, UIState>,
+	): Promise<void> {
+		for (const node of nodes) {
+			const savedNodeState = savedState.get(node.path);
+			if (node.isDirectory && savedNodeState?.expanded) {
+				// Expand this directory if it was expanded in saved state
+				this.stateController.setExpanded(node, true);
+
+				// Scan directory if not already scanned
+				if (node.children.length === 0) {
+					await scanDirectoryNode(this.rootPath, node, this.gitignoreContent);
+					this.stateController.syncUIStateForChildren(node.children);
+				}
+
+				// Recursively expand children
+				if (node.children.length > 0) {
+					await this.expandSavedDirectories(node.children, savedState);
+				}
+			}
+		}
+		this.buildFlatList();
+		this.refreshUI(this.getSelectedIndex());
 	}
 
 	private async previewFile(index: number): Promise<void> {

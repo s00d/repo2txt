@@ -8,6 +8,7 @@ import type { FileNode, UIState } from "./types.js";
  */
 export class UIStateController extends EventEmitter {
 	private uiState: Map<string, UIState> = new Map();
+	private pendingState: Map<string, UIState> = new Map(); // State for paths not yet scanned
 	private gitignoreContent: string;
 
 	constructor(gitignoreContent: string = "") {
@@ -83,9 +84,18 @@ export class UIStateController extends EventEmitter {
 
 	/**
 	 * Gets all state (for external use)
+	 * Includes both current state and pending state (for nodes not yet scanned)
 	 */
 	public getState(): Map<string, UIState> {
-		return this.uiState;
+		// Merge current state with pending state
+		const mergedState = new Map<string, UIState>(this.uiState);
+		for (const [path, state] of this.pendingState.entries()) {
+			// Add pending state if not already in current state
+			if (!mergedState.has(path)) {
+				mergedState.set(path, state);
+			}
+		}
+		return mergedState;
 	}
 
 	/**
@@ -172,14 +182,28 @@ export class UIStateController extends EventEmitter {
 			const normalizedPath = child.path.replace(/^\.\//, "");
 			const isIgnored =
 				ig.ignores(normalizedPath) || ig.ignores(normalizedPath + "/");
-			const selected = !isIgnored;
-
-			// Save expanded state if it was already set
-			const existingState = this.uiState.get(child.path);
-			this.setState(child.path, {
-				selected,
-				expanded: existingState?.expanded ?? false,
-			});
+			
+			// Check if there's pending state for this path
+			const pendingState = this.pendingState.get(child.path);
+			
+			if (pendingState) {
+				// Apply saved state for this path
+				this.setState(child.path, {
+					selected: pendingState.selected,
+					expanded: pendingState.expanded,
+				});
+				// Remove from pending
+				this.pendingState.delete(child.path);
+			} else {
+				// Use default selection based on gitignore
+				const selected = !isIgnored;
+				// Save expanded state if it was already set
+				const existingState = this.uiState.get(child.path);
+				this.setState(child.path, {
+					selected,
+					expanded: existingState?.expanded ?? false,
+				});
+			}
 
 			if (child.isDirectory && child.children.length > 0) {
 				this.syncUIStateForChildren(child.children);
@@ -198,17 +222,30 @@ export class UIStateController extends EventEmitter {
 
 		const traverse = (fileNodes: FileNode[]): void => {
 			for (const node of fileNodes) {
-				// If state is not set for this node yet, set it
+				// If state is not set for this node yet, check for pending state first
 				if (!this.uiState.has(node.path)) {
-					const normalizedPath = node.path.replace(/^\.\//, "");
-					const isIgnored =
-						ig.ignores(normalizedPath) || ig.ignores(normalizedPath + "/");
-					const selected = !isIgnored;
+					const pendingState = this.pendingState.get(node.path);
+					
+					if (pendingState) {
+						// Apply saved state
+						this.setState(node.path, {
+							selected: pendingState.selected,
+							expanded: pendingState.expanded,
+						});
+						// Remove from pending
+						this.pendingState.delete(node.path);
+					} else {
+						// Use default based on gitignore
+						const normalizedPath = node.path.replace(/^\.\//, "");
+						const isIgnored =
+							ig.ignores(normalizedPath) || ig.ignores(normalizedPath + "/");
+						const selected = !isIgnored;
 
-					this.setState(node.path, {
-						selected,
-						expanded: false,
-					});
+						this.setState(node.path, {
+							selected,
+							expanded: false,
+						});
+					}
 				}
 
 				if (node.isDirectory && node.children.length > 0) {
@@ -218,5 +255,47 @@ export class UIStateController extends EventEmitter {
 		};
 
 		traverse(nodes);
+	}
+
+	/**
+	 * Loads saved state from config file, merging with existing state
+	 * Applies state for paths that exist in current file tree,
+	 * and saves state for paths not yet scanned to apply later
+	 * @param savedState Map of saved UI state from config file
+	 * @param nodes Current file tree nodes to check which paths exist
+	 */
+	public loadState(
+		savedState: Map<string, UIState>,
+		nodes: FileNode[],
+	): void {
+		// Build set of existing paths from file tree
+		const existingPaths = new Set<string>();
+		const traverse = (fileNodes: FileNode[]): void => {
+			for (const node of fileNodes) {
+				existingPaths.add(node.path);
+				if (node.isDirectory && node.children.length > 0) {
+					traverse(node.children);
+				}
+			}
+		};
+		traverse(nodes);
+
+		// Merge saved state for paths that exist in current tree
+		for (const [path, savedStateValue] of savedState.entries()) {
+			if (existingPaths.has(path) && this.uiState.has(path)) {
+				// Update existing state with saved values
+				const currentState = this.uiState.get(path);
+				if (currentState) {
+					currentState.selected = savedStateValue.selected;
+					currentState.expanded = savedStateValue.expanded;
+					this.setState(path, currentState);
+				}
+			} else if (!existingPaths.has(path)) {
+				// Save state for paths not yet scanned - will be applied when scanned
+				this.pendingState.set(path, savedStateValue);
+			}
+		}
+
+		this.emit("state-changed");
 	}
 }

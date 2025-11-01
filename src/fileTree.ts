@@ -38,6 +38,7 @@ const SYSTEM_EXCLUDES = new Set([
 	".idea",
 	".vscode",
 	".vs",
+	".r2x",
 ]);
 
 /**
@@ -399,10 +400,10 @@ export function getTreeStructure(
 			const nextPrefix = isLastItem ? "    " : "│   ";
 
 			const state = uiState.get(node.path);
-			const marker = (state?.selected ?? false) ? "☑" : "☐";
-			const icon = node.isDirectory ? "📁" : "📄";
+			const marker = (state?.selected ?? false) ? "[✓]" : "[ ]";
+			const icon = node.isDirectory ? "▶ " : "";
 			lines.push(
-				prefix + currentPrefix + marker + " " + icon + " " + node.name,
+				prefix + currentPrefix + marker + " " + icon + node.name,
 			);
 
 			// 3. Recursive call for child elements

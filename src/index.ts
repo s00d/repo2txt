@@ -8,6 +8,7 @@ import * as path from "path";
 import { buildFileTree } from "./fileTree.js";
 import { generateMarkdown } from "./generator.js";
 import { FileTreeUI } from "./ui.js";
+import { loadConfig, saveConfig } from "./config.js";
 
 export const main = defineCommand({
 	meta: {
@@ -169,6 +170,9 @@ Hotkeys:
 		// Не показываем спиннер в консоли, так как это происходит до UI
 		const nodes = await buildFileTree(targetDir, gitignoreContent);
 
+		// Load saved state from .r2x config file if exists
+		const savedState = await loadConfig(targetDir);
+
 		// Если указан флаг skip-ui, пропускаем UI и используем файлы, выбранные по умолчанию
 		if (args["skip-ui"]) {
 			// Создаем UI состояние на основе .gitignore без создания UI
@@ -202,7 +206,7 @@ Hotkeys:
 			process.exit(0);
 		}
 
-		const ui = new FileTreeUI(nodes, targetDir, gitignoreContent);
+		const ui = new FileTreeUI(nodes, targetDir, gitignoreContent, savedState || undefined);
 		const result = await ui.show();
 
 		// Если пользователь вышел из UI через Esc/q, result будет null
@@ -210,6 +214,9 @@ Hotkeys:
 			console.log(chalk.yellow("\nOperation cancelled by user."));
 			process.exit(0);
 		}
+
+		// Save config before generating markdown
+		await saveConfig(targetDir, result.uiState);
 
 		console.log(
 			chalk.blue("\n📝 Generating markdown file... (this may take some time)"),
