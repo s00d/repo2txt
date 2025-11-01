@@ -39,6 +39,7 @@ const SYSTEM_EXCLUDES = new Set([
 	".vscode",
 	".vs",
 	".r2x",
+	".r2x_ignore",
 ]);
 
 /**
@@ -208,6 +209,12 @@ class FileTreeScanner {
 
 				const fullPath = path.join(dirPath, entry);
 				const relPath = path.join(relativePath, entry);
+				
+				// Check if path matches .gitignore or .r2x_ignore patterns
+				const normalizedRelPath = relPath.replace(/^\.\//, "");
+				if (this.ig.ignores(normalizedRelPath) || this.ig.ignores(normalizedRelPath + "/")) {
+					continue;
+				}
 
 				// Check stat cache
 				const cachedStat = statCache.get(fullPath);

@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import clipboardy from "clipboardy";
-import { defineCommand, runMain } from "citty";
+import { defineCommand } from "citty";
 import { readFile } from "fs/promises";
 import { existsSync, readFileSync } from "fs";
 import { stat } from "fs/promises";
@@ -8,7 +8,7 @@ import * as path from "path";
 import { buildFileTree } from "./fileTree.js";
 import { generateMarkdown } from "./generator.js";
 import { FileTreeUI } from "./ui.js";
-import { loadConfig, saveConfig } from "./config.js";
+import { loadConfig, saveConfig, deleteConfig } from "./config.js";
 import { startWebServer } from "./ui-web.js";
 
 export const main = defineCommand({
@@ -83,6 +83,11 @@ Hotkeys:
 			description: "Launch web interface",
 			default: false,
 		},
+		clean: {
+			type: "boolean",
+			description: "Delete .r2x config file before running (reset saved state)",
+			default: false,
+		},
 	},
 	async run({ args }) {
 		const targetDir = path.resolve(args.directory || process.cwd());
@@ -122,10 +127,10 @@ Hotkeys:
 			const configPath = path.join(targetDir, ".repo2txtrc.json");
 			try {
 				if (existsSync(configPath)) {
-					const configContent = readFileSync(configPath, "utf-8");
-					const config = JSON.parse(configContent);
-					if (config.presets && config.presets[args.preset]) {
-						presetConfig = config.presets[args.preset];
+				const configContent = readFileSync(configPath, "utf-8");
+				const config = JSON.parse(configContent);
+				if (config.presets?.[args.preset]) {
+					presetConfig = config.presets[args.preset];
 					} else {
 						console.error(
 							chalk.red(
@@ -164,6 +169,19 @@ Hotkeys:
 			}
 		}
 
+		// Read .r2x_ignore file if it exists
+		try {
+			const r2xIgnoreContent = await readFile(
+				path.join(targetDir, ".r2x_ignore"),
+				"utf-8",
+			);
+			if (r2xIgnoreContent) {
+				gitignoreContent += (gitignoreContent ? "\n" : "") + r2xIgnoreContent;
+			}
+		} catch {
+			// .r2x_ignore может отсутствовать
+		}
+
 		// Добавляем паттерны из пресета и дополнительные паттерны исключения
 		const allExcludePatterns = [
 			...(presetConfig?.exclude || []),
@@ -176,6 +194,11 @@ Hotkeys:
 
 		// Не показываем спиннер в консоли, так как это происходит до UI
 		const nodes = await buildFileTree(targetDir, gitignoreContent);
+
+		// Delete .r2x config file if --clean flag is set
+		if (args.clean) {
+			await deleteConfig(targetDir);
+		}
 
 		// Launch web interface if requested
 		if (args.ui) {

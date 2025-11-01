@@ -68,6 +68,19 @@ export async function startWebServer(
 	// Middleware
 	app.use(express.json());
 
+	// Read .r2x_ignore file if it exists and add to gitignoreContent
+	try {
+		const r2xIgnoreContent = await readFile(
+			path.join(rootPath, ".r2x_ignore"),
+			"utf-8",
+		);
+		if (r2xIgnoreContent) {
+			gitignoreContent += (gitignoreContent ? "\n" : "") + r2xIgnoreContent;
+		}
+	} catch {
+		// .r2x_ignore may not exist
+	}
+
 	// Initialize state
 	let nodes: FileNode[] = [];
 	const stateController = new UIStateController(gitignoreContent);

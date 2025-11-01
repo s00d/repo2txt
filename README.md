@@ -16,7 +16,7 @@ Available in two modes:
 
 - 🎯 **Interactive File Selection** - Navigate through your project with beautiful UI (terminal or web)
 - 📊 **Real-time Statistics** - See file count, size, and token count for selected files
-- 🔍 **Smart File Filtering** - Automatic `.gitignore` analysis, preset support, and exclusion of system/binary/private files
+- 🔍 **Smart File Filtering** - Automatic `.gitignore` and `.r2x_ignore` analysis, preset support, and exclusion of system/binary/private files
 - 🚀 **Fast & Efficient** - Stream-based generation handles large projects with ease
 - 🎨 **Syntax Highlighting** - Automatic language detection for Markdown code blocks
 - 💾 **Clipboard Support** - Copy generated content directly to clipboard
@@ -127,6 +127,7 @@ repo2txt [directory] [options]
 | `--clipboard` | `-c` | Copy output to clipboard instead of saving to file |
 | `--preset <name>` | `-p` | Use preset from `.repo2txtrc.json` |
 | `--ui` | `-u` | Launch web interface instead of terminal UI |
+| `--clean` | | Delete `.r2x` config file before running (reset saved state) |
 | `--help` | `-h` | Show help message |
 
 ### Examples
@@ -153,8 +154,14 @@ repo2txt --clipboard
 # Use preset configuration
 repo2txt --preset code
 
+# Reset saved state (delete .r2x config)
+repo2txt --clean
+
 # Combine options
 repo2txt -d ./src -o output.md -e "*.test.ts" -c
+
+# Reset state and launch web UI
+repo2txt --clean --ui
 ```
 
 ## ⚙️ Configuration
@@ -193,6 +200,45 @@ The application automatically saves your UI state (selected files, expanded fold
 - Uses JSON format with path-based state mapping
 
 You can safely commit `.r2x` files to version control to share selection preferences with your team.
+
+**Reset saved state:**
+
+To start fresh and clear saved selections, use the `--clean` flag:
+
+```bash
+repo2txt --clean
+```
+
+This will delete the `.r2x` file before launching the interface.
+
+### `.r2x_ignore` File
+
+Similar to `.gitignore`, you can create a `.r2x_ignore` file in your project root to exclude specific files and directories from the file tree. This file:
+- Uses the same syntax as `.gitignore`
+- Patterns are automatically merged with `.gitignore` rules
+- Files matching patterns will not appear in the file tree at all
+- The `.r2x_ignore` file itself is automatically excluded
+
+**Example `.r2x_ignore`:**
+
+```
+# Exclude test files
+*.test.ts
+*.spec.ts
+*.test.js
+*.spec.js
+
+# Exclude temporary directories
+temp/
+old/
+backup/
+
+# Exclude specific patterns
+*.log
+*.cache
+```
+
+**Note:** Patterns in `.r2x_ignore` work alongside `.gitignore`. Both are respected unless you use the `--ignore-gitignore` flag.
 
 ## 📄 Output Format
 

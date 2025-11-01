@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "fs/promises";
+import { readFile, writeFile, unlink } from "fs/promises";
 import * as path from "path";
 import type { UIState } from "./types.js";
 
@@ -88,6 +88,21 @@ export async function saveConfig(
 		const errorMessage =
 			error instanceof Error ? error.message : String(error);
 		console.error(`Warning: Failed to save .r2x config: ${errorMessage}`);
+	}
+}
+
+/**
+ * Deletes .r2x config file
+ * @param targetDir Target directory where .r2x file should be located
+ */
+export async function deleteConfig(targetDir: string): Promise<void> {
+	const configPath = path.join(targetDir, ".r2x");
+
+	try {
+		await unlink(configPath);
+	} catch (error) {
+		// File doesn't exist or other error - ignore silently
+		// Config deletion is optional
 	}
 }
 
