@@ -30,7 +30,6 @@
 		"prebuild": "pnpm typecheck",
 		"start": "node dist/main.js",
 		"prepublishOnly": "pnpm run build",
-		"postinstall": "node scripts/install-electron.js",
 		"dev": "tsx src/main.ts",
 		"test": "vitest",
 		"test:ui": "vitest --ui",
