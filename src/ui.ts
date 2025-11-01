@@ -3,9 +3,8 @@ import { EventEmitter } from "events";
 import { readFile } from "fs/promises";
 import * as path from "path";
 import { encode } from "gpt-tokenizer";
-import { scanDirectoryNode } from "./fileTree.js";
 import type { FileNode, UIState } from "./types.js";
-import { UIStateController } from "./uiStateController.js";
+import { RepositoryTree } from "./repositoryTree.js";
 
 export interface UITreeNode {
 	node: FileNode;
@@ -17,42 +16,15 @@ export class FileTreeUI extends EventEmitter {
 	private list: ReturnType<typeof blessed.list>;
 	private infoPanel: ReturnType<typeof blessed.box>;
 	private searchBox?: ReturnType<typeof blessed.textbox>;
-	private nodes: FileNode[];
+	private repository: RepositoryTree;
 	private flatList: UITreeNode[] = [];
-	private rootPath: string;
-	private gitignoreContent: string;
-	private stateController: UIStateController;
 	private searchQuery: string = "";
 	private isSearchMode: boolean = false;
 	private tokenCache: Map<string, number> = new Map();
 
-	constructor(
-		nodes: FileNode[],
-		rootPath: string,
-		gitignoreContent: string = "",
-		savedState?: Map<string, UIState>,
-	) {
+	constructor(repository: RepositoryTree) {
 		super();
-		this.nodes = nodes;
-		this.rootPath = rootPath;
-		this.gitignoreContent = gitignoreContent;
-
-		// Создаем контроллер состояния
-		this.stateController = new UIStateController(gitignoreContent);
-		this.stateController.initialize(nodes);
-
-		// Load saved state if provided
-		if (savedState) {
-			this.stateController.loadState(savedState, nodes);
-			// Recursively expand directories that were expanded in saved state
-			void this.expandSavedDirectories(nodes, savedState);
-		}
-
-		// Подписываемся на изменения состояния
-		this.stateController.on("state-changed", () => {
-			this.buildFlatList();
-			this.refreshUI(this.getSelectedIndex());
-		});
+		this.repository = repository;
 
 		this.screen = blessed.screen({
 			smartCSR: true,
@@ -179,19 +151,37 @@ export class FileTreeUI extends EventEmitter {
 		nodes: FileNode[],
 		gitignoreContent: string,
 	): Map<string, UIState> {
-		return UIStateController.createUIState(nodes, gitignoreContent);
+		// Создаем временный repository для генерации состояния
+		const tempRepo = new RepositoryTree(".", gitignoreContent);
+		tempRepo.nodes = nodes;
+		const traverse = (fileNodes: FileNode[]): void => {
+			for (const node of fileNodes) {
+				const normalizedPath = node.path.replace(/^\.\//, "");
+				const isIgnored =
+					tempRepo["ig"].ignores(normalizedPath) || tempRepo["ig"].ignores(normalizedPath + "/");
+				tempRepo.uiState.set(node.path, {
+					selected: !isIgnored,
+					expanded: false,
+				});
+				if (node.isDirectory) {
+					traverse(node.children);
+				}
+			}
+		};
+		traverse(nodes);
+		return tempRepo.uiState;
 	}
 
 	/**
 	 * Gets UI state for external use
 	 */
 	public getUIState(): Map<string, UIState> {
-		return this.stateController.getState();
+		return this.repository.getState();
 	}
 
 	private buildFlatList(): void {
 		this.flatList = [];
-		this.flattenNodes(this.nodes, "", true);
+		this.flattenNodes(this.repository.nodes, "", true);
 	}
 
 	private formatFileSize(bytes?: number): string {
@@ -285,15 +275,17 @@ export class FileTreeUI extends EventEmitter {
 
 			const treePrefix = isLast ? "└── " : "├── ";
 
-			const isSelected = this.stateController.isSelected(node.path);
+			const isSelected = this.repository.isSelected(node.path);
 			const marker = isSelected
 				? "{green-fg}[✓]{/green-fg}"
 				: "{gray-fg}[ ]{/gray-fg}";
 
 			let iconAndName: string;
 			if (node.isDirectory) {
-				const isExpanded = this.stateController.isExpanded(node.path);
-				const icon = isExpanded ? "▼" : "▶";
+				const isExpanded = this.repository.isExpanded(node.path);
+				// Показываем ▼ только если папка раскрыта И есть дети, которые отображаются
+				// Иначе показываем ▶
+				const icon = (isExpanded && node.children.length > 0) ? "▼" : "▶";
 				iconAndName = `{cyan-fg} ${icon} {bold}${node.name}{/bold}{/cyan-fg}`;
 			} else {
 				iconAndName = `{yellow-fg}{bold}${node.name}{/bold}{/yellow-fg}`;
@@ -309,7 +301,7 @@ export class FileTreeUI extends EventEmitter {
 			this.flatList.push({ node, line });
 
 			// Показываем детей, если папка раскрыта или идет поиск
-			const isExpanded = this.stateController.isExpanded(node.path);
+			const isExpanded = this.repository.isExpanded(node.path);
 			if (
 				node.isDirectory &&
 				(isExpanded || this.searchQuery) &&
@@ -375,7 +367,7 @@ export class FileTreeUI extends EventEmitter {
 			} else {
 				// Асинхронно подсчитываем токены
 				try {
-					const fullPath = path.join(this.rootPath, filePath);
+					const fullPath = path.join(this.repository.rootPath, filePath);
 					const content = await readFile(fullPath, "utf-8");
 					tokenCount = encode(content).length;
 					this.tokenCache.set(filePath, tokenCount);
@@ -400,7 +392,7 @@ export class FileTreeUI extends EventEmitter {
 			// Preview file (first 20 lines) with separator
 			if (node.size && node.size < 100000) {
 				try {
-					const fullPath = path.join(this.rootPath, node.path);
+					const fullPath = path.join(this.repository.rootPath, node.path);
 					const fileContent = await readFile(fullPath, "utf-8");
 					const lines = fileContent.split("\n").slice(0, 20);
 					content += `{gray-fg}─{/gray-fg}\n`; // Separator
@@ -509,7 +501,7 @@ export class FileTreeUI extends EventEmitter {
 		}
 
 		const targetNode = item.node;
-		this.stateController.toggleSelection(targetNode);
+		this.repository.toggleSelection(targetNode);
 
 		// Очищаем кэш токенов при изменении выбора
 		if (!targetNode.isDirectory) {
@@ -545,23 +537,37 @@ export class FileTreeUI extends EventEmitter {
 		if (!item) return;
 
 		const node = item.node;
-		if (
-			!node.isDirectory ||
-			this.stateController.isExpanded(node.path) === expand
-		) {
+		if (!node.isDirectory) {
 			return;
 		}
 
-		if (expand && node.children.length === 0) {
-			// Сканируем директорию
-			await scanDirectoryNode(this.rootPath, node, this.gitignoreContent);
-			// После сканирования нужно обновить состояние для новых детей
-			this.stateController.syncUIStateForChildren(node.children);
+		const currentlyExpanded = this.repository.isExpanded(node.path);
+		
+		// Если уже в нужном состоянии, ничего не делаем
+		if (currentlyExpanded === expand) {
+			return;
 		}
 
-		this.stateController.setExpanded(node, expand);
+		// Если нужно раскрыть и папка еще не сканирована
+		if (expand && node.children.length === 0) {
+			// Сканируем директорию через repository
+			await this.repository.scanDirectory(node);
+			// Состояние синхронизируется автоматически внутри scanDirectory
+		}
+
+		// Устанавливаем состояние раскрытия
+		this.repository.setExpanded(node, expand);
+		
+		// Перестраиваем список и обновляем UI
 		this.buildFlatList();
-		this.refreshUI(index);
+		
+		// Находим новый индекс после перестройки списка
+		const newIndex = this.flatList.findIndex(
+			(item) => item.node === node,
+		);
+		
+		// Используем новый индекс, если найден, иначе оставляем текущий
+		this.refreshUI(newIndex >= 0 ? newIndex : index);
 	}
 
 	private async expandNode(index: number): Promise<void> {
@@ -572,35 +578,6 @@ export class FileTreeUI extends EventEmitter {
 		void this.toggleNodeExpansion(index, false);
 	}
 
-	/**
-	 * Recursively expands directories that were expanded in saved state
-	 */
-	private async expandSavedDirectories(
-		nodes: FileNode[],
-		savedState: Map<string, UIState>,
-	): Promise<void> {
-		for (const node of nodes) {
-			const savedNodeState = savedState.get(node.path);
-			if (node.isDirectory && savedNodeState?.expanded) {
-				// Expand this directory if it was expanded in saved state
-				this.stateController.setExpanded(node, true);
-
-				// Scan directory if not already scanned
-				if (node.children.length === 0) {
-					await scanDirectoryNode(this.rootPath, node, this.gitignoreContent);
-					this.stateController.syncUIStateForChildren(node.children);
-				}
-
-				// Recursively expand children
-				if (node.children.length > 0) {
-					await this.expandSavedDirectories(node.children, savedState);
-				}
-			}
-		}
-		this.buildFlatList();
-		this.refreshUI(this.getSelectedIndex());
-	}
-
 	private async previewFile(index: number): Promise<void> {
 		const item = this.flatList[index];
 		if (!item || item.node.isDirectory) {
@@ -608,7 +585,7 @@ export class FileTreeUI extends EventEmitter {
 		}
 
 		try {
-			const fullPath = path.join(this.rootPath, item.node.path);
+			const fullPath = path.join(this.repository.rootPath, item.node.path);
 			const content = await readFile(fullPath, "utf-8");
 
 			const previewBox = blessed.box({
@@ -652,8 +629,8 @@ export class FileTreeUI extends EventEmitter {
 		this.screen.destroy();
 		// Возвращаем nodes и uiState (статистика будет подсчитана во время генерации)
 		this.emit("selection-complete", {
-			nodes: this.nodes,
-			uiState: this.stateController.getState(),
+			nodes: this.repository.nodes,
+			uiState: this.repository.getState(),
 		});
 	}
 

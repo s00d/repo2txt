@@ -4,61 +4,18 @@ import { fileURLToPath } from "url";
 import { readFile, stat } from "fs/promises";
 import { existsSync } from "fs";
 import { spawn, type ChildProcess } from "child_process";
-import { buildFileTree, scanDirectoryNode, getSelectedFiles } from "./fileTree.js";
 import { generateMarkdown, getLanguageByExtension } from "./generator.js";
-import { UIStateController } from "./uiStateController.js";
-import { loadConfig, saveConfig } from "./config.js";
+import { RepositoryTree } from "./repositoryTree.js";
 import type { FileNode } from "./types.js";
 import { encode } from "gpt-tokenizer";
 import clipboardy from "clipboardy";
 
-/**
- * Helper function to find a node by path in the tree
- */
-function findNodeByPath(
-	nodes: FileNode[],
-	targetPath: string,
-): FileNode | null {
-	for (const node of nodes) {
-		if (node.path === targetPath) {
-			return node;
-		}
-		if (node.isDirectory && node.children.length > 0) {
-			const found = findNodeByPath(node.children, targetPath);
-			if (found) return found;
-		}
-	}
-	return null;
-}
-
-/**
- * Helper function to update node in tree
- */
-function updateNodeInTree(
-	nodes: FileNode[],
-	targetPath: string,
-	updater: (node: FileNode) => FileNode,
-): FileNode[] {
-	return nodes.map((node) => {
-		if (node.path === targetPath) {
-			return updater(node);
-		}
-		if (node.isDirectory) {
-			return {
-				...node,
-				children: updateNodeInTree(node.children, targetPath, updater),
-			};
-		}
-		return node;
-	});
-}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export async function startWebServer(
-	rootPath: string,
-	gitignoreContent: string = "",
+	repository: RepositoryTree,
 	port: number = 8765,
 ): Promise<void> {
 	const app = express();
@@ -72,45 +29,14 @@ export async function startWebServer(
 	// Middleware
 	app.use(express.json());
 
-	// Read .r2x_ignore file if it exists and add to gitignoreContent
-	try {
-		const r2xIgnoreContent = await readFile(
-			path.join(rootPath, ".r2x_ignore"),
-			"utf-8",
-		);
-		if (r2xIgnoreContent) {
-			gitignoreContent += (gitignoreContent ? "\n" : "") + r2xIgnoreContent;
-		}
-	} catch {
-		// .r2x_ignore may not exist
-	}
-
-	// Initialize state
-	let nodes: FileNode[] = [];
-	const stateController = new UIStateController(gitignoreContent);
 	const tokenCache = new Map<string, number>();
-
-	// Load initial tree
-	try {
-		nodes = await buildFileTree(rootPath, gitignoreContent);
-		stateController.initialize(nodes);
-
-		// Load saved state
-		const savedState = await loadConfig(rootPath);
-		if (savedState) {
-			stateController.loadState(savedState, nodes);
-		}
-	} catch (error) {
-		console.error("Failed to initialize file tree:", error);
-		process.exit(1);
-	}
 
 	// API Routes must be defined before static file serving
 
 	// GET /api/tree - Get initial file tree
 	app.get("/api/tree", (_req, res) => {
 		try {
-			res.json({ nodes, rootPath });
+			res.json({ nodes: repository.nodes, rootPath: repository.rootPath });
 		} catch (error) {
 			res.status(500).json({
 				error:
@@ -123,14 +49,14 @@ export async function startWebServer(
 	app.post("/api/scan", async (req, res) => {
 		try {
 			const { path: dirPath } = req.body;
-			const node = findNodeByPath(nodes, dirPath);
+			const node = repository.findNodeByPath(dirPath);
 			if (!node || !node.isDirectory) {
 				return res.status(404).json({ error: "Directory not found" });
 			}
 
 			if (node.children.length === 0) {
-				await scanDirectoryNode(rootPath, node, gitignoreContent);
-				stateController.syncUIStateForChildren(node.children);
+				await repository.scanDirectory(node);
+				// Состояние синхронизируется автоматически внутри scanDirectory
 			}
 
 			res.json({ children: node.children });
@@ -145,7 +71,7 @@ export async function startWebServer(
 	// GET /api/state - Get UI state
 	app.get("/api/state", (_req, res) => {
 		try {
-			const uiState = stateController.getState();
+			const uiState = repository.getState();
 			const stateObj = Object.fromEntries(uiState);
 			res.json({ state: stateObj });
 		} catch (error) {
@@ -160,22 +86,22 @@ export async function startWebServer(
 	app.post("/api/state", async (req, res) => {
 		try {
 			const { path: nodePath, selected, expanded } = req.body;
-			const node = findNodeByPath(nodes, nodePath);
+			const node = repository.findNodeByPath(nodePath);
 			if (!node) {
 				return res.status(404).json({ error: "Node not found" });
 			}
 
 			if (selected !== undefined) {
-				const isCurrentlySelected = stateController.isSelected(nodePath);
+				const isCurrentlySelected = repository.isSelected(nodePath);
 				if (isCurrentlySelected !== selected) {
-					stateController.toggleSelection(node);
+					repository.toggleSelection(node);
 				}
 			}
 			if (expanded !== undefined) {
-				stateController.setExpanded(node, expanded);
+				repository.setExpanded(node, expanded);
 			}
 
-			const updatedState = Object.fromEntries(stateController.getState());
+			const updatedState = Object.fromEntries(repository.getState());
 			res.json({ state: updatedState });
 		} catch (error) {
 			res.status(500).json({
@@ -193,7 +119,7 @@ export async function startWebServer(
 				return res.status(400).json({ error: "Path parameter is required" });
 			}
 			const decodedPath = decodeURIComponent(filePathParam);
-			const filePath = path.join(rootPath, decodedPath);
+			const filePath = path.join(repository.rootPath, decodedPath);
 			const stats = await stat(filePath);
 
 			if (stats.size > 100000) {
@@ -228,15 +154,12 @@ export async function startWebServer(
 	// GET /api/stats - Get statistics
 	app.get("/api/stats", async (_req, res) => {
 		try {
-			const selectedFiles = getSelectedFiles(
-				nodes,
-				stateController.getState(),
-			);
+			const selectedFiles = repository.getSelectedFiles();
 			let totalSize = 0;
 			let totalTokens = 0;
 
 			for (const filePath of selectedFiles) {
-				const fullPath = path.join(rootPath, filePath);
+				const fullPath = path.join(repository.rootPath, filePath);
 				const stats = await stat(fullPath);
 				const size =
 					typeof stats.size === "bigint"
@@ -277,15 +200,12 @@ export async function startWebServer(
 			const { outputPath, clipboard } = req.body;
 
 			// Save config
-			await saveConfig(rootPath, stateController.getState());
+			await repository.save();
 
 			// Generate markdown
 			const content = await generateMarkdown(
-				nodes,
-				rootPath,
+				repository,
 				clipboard ? null : (outputPath || "output.md"),
-				stateController.getState(),
-				gitignoreContent,
 			);
 
 			if (clipboard) {

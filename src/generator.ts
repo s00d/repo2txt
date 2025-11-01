@@ -3,12 +3,7 @@ import { createWriteStream } from "fs";
 import { readFile, stat } from "fs/promises";
 import * as path from "path";
 import { encode } from "gpt-tokenizer";
-import ignore from "ignore";
-import {
-	getSelectedFiles,
-	getTreeStructure,
-	scanAllDirectories,
-} from "./fileTree.js";
+import { RepositoryTree } from "./repositoryTree.js";
 import type { FileNode, UIState } from "./types.js";
 
 export function getLanguageByExtension(filePath: string): string {
@@ -74,43 +69,6 @@ export function getLanguageByExtension(filePath: string): string {
 	return languageMap[ext] || "text";
 }
 
-/**
- * Recursively updates UI state for all nodes (including newly scanned)
- * Only sets state for nodes that don't have state yet (based on gitignore)
- */
-function updateUIStateForAllNodes(
-	nodes: FileNode[],
-	uiState: Map<string, UIState>,
-	gitignoreContent: string,
-): void {
-	const ig = ignore();
-	if (gitignoreContent) {
-		ig.add(gitignoreContent);
-	}
-
-	function traverse(fileNodes: FileNode[]): void {
-		for (const node of fileNodes) {
-			// Only set state if it doesn't exist yet
-			if (!uiState.has(node.path)) {
-				const normalizedPath = node.path.replace(/^\.\//, "");
-				const isIgnored =
-					ig.ignores(normalizedPath) || ig.ignores(normalizedPath + "/");
-				const selected = !isIgnored;
-
-				uiState.set(node.path, {
-					selected,
-					expanded: false,
-				});
-			}
-
-			if (node.isDirectory && node.children.length > 0) {
-				traverse(node.children);
-			}
-		}
-	}
-
-	traverse(nodes);
-}
 
 /**
  * Interface for Markdown generation data
@@ -134,19 +92,13 @@ export interface GenerationStats {
  * Scans all directories and returns lists of selected files and tree structure
  */
 export async function prepareMarkdownData(
-	nodes: FileNode[],
-	rootPath: string,
-	uiState: Map<string, UIState>,
-	gitignoreContent?: string,
+	repository: RepositoryTree,
 ): Promise<MarkdownData> {
-	// Scan all directories to generate full structure
-	await scanAllDirectories(rootPath, nodes, gitignoreContent);
+	// Сканируем все выбранные директории рекурсивно (даже если они свернуты)
+	await repository.scanSelectedDirectories();
 
-	// Update UI state for all newly scanned nodes
-	updateUIStateForAllNodes(nodes, uiState, gitignoreContent || "");
-
-	const selectedFiles = getSelectedFiles(nodes, uiState);
-	const treeStructure = getTreeStructure(nodes, uiState);
+	const selectedFiles = repository.getSelectedFiles();
+	const treeStructure = repository.getTreeStructure();
 
 	return {
 		selectedFiles,
@@ -323,19 +275,11 @@ export async function writeMarkdown(
  * Wrapper over prepareMarkdownData and writeMarkdown for backward compatibility
  */
 export async function generateMarkdown(
-	nodes: FileNode[],
-	rootPath: string,
+	repository: RepositoryTree,
 	outputPath: string | null,
-	uiState: Map<string, UIState>,
-	gitignoreContent?: string,
 ): Promise<string> {
-	const data = await prepareMarkdownData(
-		nodes,
-		rootPath,
-		uiState,
-		gitignoreContent,
-	);
-	const result = await writeMarkdown(data, rootPath, outputPath);
+	const data = await prepareMarkdownData(repository);
+	const result = await writeMarkdown(data, repository.rootPath, outputPath);
 
 	// Output statistics to console
 	const sizeStr = formatFileSize(result.stats.size);

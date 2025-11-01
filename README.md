@@ -194,10 +194,11 @@ repo2txt --preset code
 ### `.r2x` State File
 
 The application automatically saves your UI state (selected files, expanded folders) to a `.r2x` file in the target directory after generating Markdown. This file:
-- Saves your selection and folder expansion state
+- Saves your selection and folder expansion state in a nested structure
+- Stores state for all nodes including children recursively
 - Is automatically loaded on next run
 - Is excluded from scanning (not included in generated output)
-- Uses JSON format with path-based state mapping
+- Uses JSON format with nested tree structure matching file hierarchy
 
 You can safely commit `.r2x` files to version control to share selection preferences with your team.
 
@@ -282,7 +283,7 @@ export interface FileNode {
 
 ## 🏗️ Architecture
 
-Built with TypeScript and modern Node.js:
+Built with TypeScript and modern Node.js using a clean class-based architecture with event-driven design:
 
 ### Core Dependencies
 - **blessed** - Interactive terminal UI framework
@@ -291,6 +292,7 @@ Built with TypeScript and modern Node.js:
 - **citty** - CLI argument parsing
 - **chalk** - Colored console output
 - **clipboardy** - Clipboard integration
+- **electron** - Desktop application wrapper for web UI
 
 ### Web UI Dependencies
 - **React** - Frontend framework
@@ -298,18 +300,31 @@ Built with TypeScript and modern Node.js:
 - **Express** - Backend API server
 - **Tailwind CSS** - Utility-first CSS framework
 
+### Architecture Overview
+
+The project uses a clean separation of concerns:
+
+- **`RepositoryTree`** - Core class that manages file tree structure and node state
+  - Stores all file nodes and state (selected/expanded)
+  - Handles file scanning, state synchronization, and persistence
+  - Emits events for state changes (`state-changed`, `nodes-scanned`)
+  - Completely independent of UI layers
+  
+- **UI Layers** - Terminal and Web interfaces that consume `RepositoryTree`
+  - Receive data from `RepositoryTree` via methods and events
+  - Interact with repository through public API only
+  - No direct access to internal state management
+
 ### Project Structure
 
 ```
 src/
-├── types.ts              # Type definitions
-├── fileTree.ts           # File tree building and .gitignore handling
-├── uiStateController.ts  # UI state management
-├── ui.ts                 # Interactive terminal interface
-├── ui-web.ts             # Web server and API endpoints
-├── generator.ts          # Markdown generation
-├── config.ts             # .r2x config file handling
-├── index.ts              # CLI entry point
+├── types.ts              # Type definitions (FileNode, UIState)
+├── repositoryTree.ts     # Core class: file tree & state management
+├── ui.ts                 # Interactive terminal interface (blessed)
+├── ui-web.ts             # Web server and API endpoints (Express)
+├── generator.ts          # Markdown generation logic
+├── index.ts              # CLI entry point and command definition
 └── main.ts               # Main entry point
 
 web/
@@ -325,6 +340,14 @@ web/
     ├── Toolbar.tsx       # Action toolbar
     └── Modal.tsx         # Result modal
 ```
+
+### Key Design Principles
+
+1. **Single Responsibility** - `RepositoryTree` handles only data management
+2. **Event-Driven** - UI layers subscribe to repository events
+3. **No UI Dependencies** - Core class has no knowledge of UI implementations
+4. **State Persistence** - Automatic save/load of complete tree state
+5. **Lazy Loading** - Directories scanned only when needed
 
 ## 🛠️ Development
 

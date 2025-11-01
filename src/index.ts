@@ -1,15 +1,14 @@
 import chalk from "chalk";
 import clipboardy from "clipboardy";
 import { defineCommand } from "citty";
-import { readFile } from "fs/promises";
+import { readFile, unlink } from "fs/promises";
 import { existsSync, readFileSync } from "fs";
 import { stat } from "fs/promises";
 import * as path from "path";
-import { buildFileTree } from "./fileTree.js";
 import { generateMarkdown } from "./generator.js";
 import { FileTreeUI } from "./ui.js";
-import { loadConfig, saveConfig, deleteConfig } from "./config.js";
 import { startWebServer } from "./ui-web.js";
+import { RepositoryTree } from "./repositoryTree.js";
 
 export const main = defineCommand({
 	meta: {
@@ -191,28 +190,34 @@ Hotkeys:
 			gitignoreContent += "\n" + allExcludePatterns.join("\n");
 		}
 
-		// Не показываем спиннер в консоли, так как это происходит до UI
-		const nodes = await buildFileTree(targetDir, gitignoreContent);
-
 		// Delete .r2x config file if --clean flag is set
 		if (args.clean) {
-			await deleteConfig(targetDir);
+			const configPath = path.join(targetDir, ".r2x");
+			if (existsSync(configPath)) {
+				await unlink(configPath);
+			}
+		}
+
+		// Создаем экземпляр RepositoryTree
+		const repository = new RepositoryTree(targetDir, gitignoreContent);
+
+		// Пытаемся загрузить сохраненное состояние
+		const loaded = await repository.load();
+
+		// Если не загружено, инициализируем новое дерево
+		if (!loaded) {
+			await repository.initialize();
 		}
 
 		// Launch web interface if requested
 		if (args.ui) {
-			await startWebServer(targetDir, gitignoreContent);
+			await startWebServer(repository);
 			// Server runs indefinitely, don't continue execution
 			return;
 		}
 
-		// Load saved state from .r2x config file if exists
-		const savedState = await loadConfig(targetDir);
-
 		// Если указан флаг skip-ui, пропускаем UI и используем файлы, выбранные по умолчанию
 		if (args["skip-ui"]) {
-			// Создаем UI состояние на основе .gitignore без создания UI
-			const uiState = FileTreeUI.createUIState(nodes, gitignoreContent);
 
 			console.log(
 				chalk.blue(
@@ -224,11 +229,8 @@ Hotkeys:
 			const finalOutputPath = useClipboard ? null : outputPath;
 
 			const markdownContent = await generateMarkdown(
-				nodes,
-				targetDir,
+				repository,
 				finalOutputPath,
-				uiState,
-				gitignoreContent,
 			);
 
 			if (useClipboard) {
@@ -242,7 +244,7 @@ Hotkeys:
 			process.exit(0);
 		}
 
-		const ui = new FileTreeUI(nodes, targetDir, gitignoreContent, savedState || undefined);
+		const ui = new FileTreeUI(repository);
 		const result = await ui.show();
 
 		// Если пользователь вышел из UI через Esc/q, result будет null
@@ -251,8 +253,14 @@ Hotkeys:
 			process.exit(0);
 		}
 
-		// Save config before generating markdown
-		await saveConfig(targetDir, result.uiState);
+		// Обновляем состояние репозитория из результата UI
+		if (result) {
+			repository.nodes = result.nodes;
+			repository.uiState = result.uiState;
+		}
+
+		// Сохраняем состояние
+		await repository.save();
 
 		console.log(
 			chalk.blue("\n📝 Generating markdown file... (this may take some time)"),
@@ -262,11 +270,8 @@ Hotkeys:
 		const finalOutputPath = useClipboard ? null : outputPath;
 
 		const markdownContent = await generateMarkdown(
-			result.nodes,
-			targetDir,
+			repository,
 			finalOutputPath,
-			result.uiState,
-			gitignoreContent,
 		);
 
 		if (useClipboard) {
@@ -284,14 +289,7 @@ Hotkeys:
 // Public API exports
 export type { FileNode } from "./types.js";
 export { FileTreeUI, type UITreeNode } from "./ui.js";
-export {
-	buildFileTree,
-	scanDirectoryNode,
-	getSelectedFiles,
-	scanAllDirectories,
-	getTreeStructure,
-	sortNodes,
-} from "./fileTree.js";
+export { RepositoryTree } from "./repositoryTree.js";
 export {
 	generateMarkdown,
 	getLanguageByExtension,
