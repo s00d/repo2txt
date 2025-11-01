@@ -9,6 +9,7 @@ import { buildFileTree } from "./fileTree.js";
 import { generateMarkdown } from "./generator.js";
 import { FileTreeUI } from "./ui.js";
 import { loadConfig, saveConfig } from "./config.js";
+import { startWebServer } from "./ui-web.js";
 
 export const main = defineCommand({
 	meta: {
@@ -75,6 +76,12 @@ Hotkeys:
 			type: "string",
 			alias: "p",
 			description: "Use preset from .repo2txtrc.json",
+		},
+		ui: {
+			type: "boolean",
+			alias: "u",
+			description: "Launch web interface",
+			default: false,
 		},
 	},
 	async run({ args }) {
@@ -169,6 +176,13 @@ Hotkeys:
 
 		// Не показываем спиннер в консоли, так как это происходит до UI
 		const nodes = await buildFileTree(targetDir, gitignoreContent);
+
+		// Launch web interface if requested
+		if (args.ui) {
+			await startWebServer(targetDir, gitignoreContent);
+			// Server runs indefinitely, don't continue execution
+			return;
+		}
 
 		// Load saved state from .r2x config file if exists
 		const savedState = await loadConfig(targetDir);

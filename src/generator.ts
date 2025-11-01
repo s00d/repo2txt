@@ -3,7 +3,7 @@ import { createWriteStream } from "fs";
 import { readFile, stat } from "fs/promises";
 import * as path from "path";
 import { encode } from "gpt-tokenizer";
-import { UIStateController } from "./uiStateController.js";
+import ignore from "ignore";
 import {
 	getSelectedFiles,
 	getTreeStructure,
@@ -76,23 +76,40 @@ export function getLanguageByExtension(filePath: string): string {
 
 /**
  * Recursively updates UI state for all nodes (including newly scanned)
+ * Only sets state for nodes that don't have state yet (based on gitignore)
  */
 function updateUIStateForAllNodes(
 	nodes: FileNode[],
 	uiState: Map<string, UIState>,
 	gitignoreContent: string,
 ): void {
-	// Use UIStateController to update state
-	const controller = new UIStateController(gitignoreContent);
-	// Fill controller with existing state
-	for (const [path, state] of uiState.entries()) {
-		controller.getState().set(path, state);
+	const ig = ignore();
+	if (gitignoreContent) {
+		ig.add(gitignoreContent);
 	}
-	controller.updateStateForAllNodes(nodes);
-	// Copy updated state back
-	for (const [path, state] of controller.getState().entries()) {
-		uiState.set(path, state);
+
+	function traverse(fileNodes: FileNode[]): void {
+		for (const node of fileNodes) {
+			// Only set state if it doesn't exist yet
+			if (!uiState.has(node.path)) {
+				const normalizedPath = node.path.replace(/^\.\//, "");
+				const isIgnored =
+					ig.ignores(normalizedPath) || ig.ignores(normalizedPath + "/");
+				const selected = !isIgnored;
+
+				uiState.set(node.path, {
+					selected,
+					expanded: false,
+				});
+			}
+
+			if (node.isDirectory && node.children.length > 0) {
+				traverse(node.children);
+			}
+		}
 	}
+
+	traverse(nodes);
 }
 
 /**

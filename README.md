@@ -6,17 +6,25 @@
 [![GitHub stars](https://img.shields.io/github/stars/s00d/repo2txt?style=for-the-badge)](https://github.com/s00d/repo2txt)
 [![Donate](https://img.shields.io/badge/Donate-Donationalerts-ff4081?style=for-the-badge)](https://www.donationalerts.com/r/s00d88)
 
-A powerful console utility for interactively selecting files and folders with checkboxes, building a file tree, and generating a unified Markdown file with all selected files. Perfect for preparing code context for LLMs, documenting project structure, and creating codebase snapshots.
+A powerful utility for interactively selecting files and folders with checkboxes, building a file tree, and generating a unified Markdown file with all selected files. Perfect for preparing code context for LLMs, documenting project structure, and creating codebase snapshots.
+
+Available in two modes:
+- **Terminal UI** - Beautiful console-based interface with keyboard navigation
+- **Web UI** - Modern cross-platform web interface accessible in any browser
 
 ## ✨ Features
 
-- 🎯 **Interactive File Selection** - Navigate through your project with a beautiful terminal UI
+- 🎯 **Interactive File Selection** - Navigate through your project with beautiful UI (terminal or web)
 - 📊 **Real-time Statistics** - See file count, size, and token count for selected files
-- 🔍 **Smart File Filtering** - Automatic `.gitignore` analysis and preset support
+- 🔍 **Smart File Filtering** - Automatic `.gitignore` analysis, preset support, and exclusion of system/binary/private files
 - 🚀 **Fast & Efficient** - Stream-based generation handles large projects with ease
 - 🎨 **Syntax Highlighting** - Automatic language detection for Markdown code blocks
 - 💾 **Clipboard Support** - Copy generated content directly to clipboard
-- 🔎 **Search & Preview** - Quickly find and preview files in the terminal
+- 🔎 **Search & Preview** - Quickly find and preview files
+- 💾 **State Persistence** - UI state (selected files, expanded folders) is saved to `.r2x` config file
+- 🌐 **Web Interface** - Modern React-based web UI with Tailwind CSS (launch with `--ui` flag)
+- 📈 **Token Counting** - Approximate LLM token count using GPT tokenizer
+- 🎛️ **Recursive Selection** - Toggle parent folder to select/deselect all children
 
 ## 🎯 Use Cases
 
@@ -31,23 +39,40 @@ A powerful console utility for interactively selecting files and folders with ch
 npm i -g repo2txt
 ```
 
-After installation, use `repo2txt` from anywhere:
+After installation, use `repo2txt` or `r2t` from anywhere:
 
 ```bash
 repo2txt [options]
+# or
+r2t [options]
 ```
 
 ## 🚀 Quick Start
 
-### Basic Usage
+### Terminal UI Mode
 
-Run in the current directory:
+Run in the current directory with terminal interface:
 
 ```bash
 repo2txt
 ```
 
-The interactive UI will open showing your file tree. Use the controls below to select files and generate Markdown.
+The interactive terminal UI will open showing your file tree. Use keyboard controls to select files and generate Markdown.
+
+### Web UI Mode
+
+Launch the web interface (opens automatically in your browser):
+
+```bash
+repo2txt --ui
+# or
+repo2txt -u
+```
+
+The web interface will start on `http://localhost:8765` (or next available port). Use your mouse to:
+- Click checkboxes to select/deselect files
+- Click folder icons to expand/collapse directories
+- Use the toolbar to generate Markdown and view results
 
 ### Skip UI Mode
 
@@ -65,7 +90,7 @@ repo2txt --clipboard
 repo2txt -c
 ```
 
-## ⌨️ Keyboard Controls
+## ⌨️ Keyboard Controls (Terminal UI)
 
 ### Navigation
 - `↑/↓` - Navigate through the list
@@ -73,7 +98,7 @@ repo2txt -c
 - `←` or `h` - Collapse folder
 
 ### Selection
-- `Space` - Select/deselect file or folder
+- `Space` - Select/deselect file or folder (recursively toggles children)
 - `Double click` - Toggle selection
 
 ### Actions
@@ -96,11 +121,12 @@ repo2txt [directory] [options]
 |--------|-------|-------------|
 | `--directory <path>` | `-d` | Target directory to scan (default: current directory) |
 | `--output <file>` | `-o` | Output file path (default: `output.md`) |
-| `--ignore-gitignore` | | Ignore `.gitignore` when scanning |
+| `--ignore-gitignore` | `-i` | Ignore `.gitignore` when scanning |
 | `--exclude <pattern>` | `-e` | Add exclusion patterns (can be used multiple times) |
 | `--skip-ui` | `-s` | Skip interactive UI and generate directly |
 | `--clipboard` | `-c` | Copy output to clipboard instead of saving to file |
 | `--preset <name>` | `-p` | Use preset from `.repo2txtrc.json` |
+| `--ui` | `-u` | Launch web interface instead of terminal UI |
 | `--help` | `-h` | Show help message |
 
 ### Examples
@@ -108,6 +134,9 @@ repo2txt [directory] [options]
 ```bash
 # Scan specific directory and save to custom file
 repo2txt -d ./my-project -o project-snapshot.md
+
+# Launch web interface
+repo2txt --ui
 
 # Ignore .gitignore rules
 repo2txt --ignore-gitignore
@@ -155,12 +184,22 @@ Then use with:
 repo2txt --preset code
 ```
 
+### `.r2x` State File
+
+The application automatically saves your UI state (selected files, expanded folders) to a `.r2x` file in the target directory after generating Markdown. This file:
+- Saves your selection and folder expansion state
+- Is automatically loaded on next run
+- Is excluded from scanning (not included in generated output)
+- Uses JSON format with path-based state mapping
+
+You can safely commit `.r2x` files to version control to share selection preferences with your team.
+
 ## 📄 Output Format
 
 The generated Markdown file contains:
 
 1. **Header** - Document title
-2. **File Structure** - Text tree of all selected files
+2. **File Structure** - Text tree of all selected files with checkboxes
 3. **File Contents** - Each file includes:
    - File path as heading
    - Code block with language syntax highlighting
@@ -174,10 +213,10 @@ The generated Markdown file contains:
 ## File Structure
 
 ```
-├── ☑ 📁 src
-│   ├── ☑ 📄 types.ts
-│   └── ☑ 📄 index.ts
-└── ☑ 📄 README.md
+├── [✓] ▶ src
+│   ├── [✓] types.ts
+│   └── [✓] index.ts
+└── [✓] README.md
 ```
 
 ---
@@ -199,12 +238,19 @@ export interface FileNode {
 
 Built with TypeScript and modern Node.js:
 
+### Core Dependencies
 - **blessed** - Interactive terminal UI framework
 - **gpt-tokenizer** - Token counting for LLM context
 - **ignore** - `.gitignore` parsing
 - **citty** - CLI argument parsing
 - **chalk** - Colored console output
 - **clipboardy** - Clipboard integration
+
+### Web UI Dependencies
+- **React** - Frontend framework
+- **Vite** - Build tool and dev server
+- **Express** - Backend API server
+- **Tailwind CSS** - Utility-first CSS framework
 
 ### Project Structure
 
@@ -214,9 +260,24 @@ src/
 ├── fileTree.ts           # File tree building and .gitignore handling
 ├── uiStateController.ts  # UI state management
 ├── ui.ts                 # Interactive terminal interface
+├── ui-web.ts             # Web server and API endpoints
 ├── generator.ts          # Markdown generation
+├── config.ts             # .r2x config file handling
 ├── index.ts              # CLI entry point
 └── main.ts               # Main entry point
+
+web/
+├── index.html            # Web UI entry point
+├── main.tsx              # React app initialization
+├── app.tsx               # Main app component
+├── api.ts                # API client
+├── styles.css            # Global styles (Tailwind)
+└── components/
+    ├── FileTree.tsx      # File tree component
+    ├── FilePreview.tsx   # File preview component
+    ├── StatsPanel.tsx    # Statistics panel
+    ├── Toolbar.tsx       # Action toolbar
+    └── Modal.tsx         # Result modal
 ```
 
 ## 🛠️ Development
@@ -236,18 +297,23 @@ cd repo2txt
 # Install dependencies
 pnpm install
 
-# Build
+# Build (CLI + Web UI)
 pnpm run build
 
-# Run
+# Run terminal UI
 pnpm start
+
+# Run web UI
+pnpm run dev -- --ui
 ```
 
 ### Development Scripts
 
 ```bash
 pnpm run dev          # Development with hot reload (tsx)
-pnpm run build        # Build project
+pnpm run dev -- --ui # Development with web UI
+pnpm run build        # Build project (CLI + Web UI)
+pnpm run build:web    # Build only web UI
 pnpm run typecheck    # Type checking
 pnpm run lint         # Lint code
 pnpm run format       # Format code
@@ -261,12 +327,15 @@ pnpm run test:ui      # Run tests with UI
 - **Streaming I/O** - Large files are processed efficiently
 - **Caching** - File statistics and token counts are cached
 - **Optimized Rendering** - UI updates are pre-calculated for smooth performance
+- **Binary File Exclusion** - Common binary file types are automatically excluded
+- **System File Exclusion** - System directories (`.git`, `node_modules`, etc.) are excluded by default
 
 ## 🐛 Known Limitations
 
-- Binary files are read as text (may produce incorrect output)
+- Binary files are excluded from scanning (images, videos, archives, etc.)
 - Very large files (>100MB) may take time to process
 - Token counting is approximate (uses GPT tokenizer)
+- Private files (`.env`, keys, certificates) are excluded by default
 
 ## 🤝 Contributing
 
@@ -286,8 +355,8 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 - **Repository**: [https://github.com/s00d/repo2txt](https://github.com/s00d/repo2txt)
 - **Issues**: [https://github.com/s00d/repo2txt/issues](https://github.com/s00d/repo2txt/issues)
+- **NPM Package**: [https://www.npmjs.com/package/repo2txt](https://www.npmjs.com/package/repo2txt)
 
 ---
 
 Made with ❤️ for developers who need to prepare code context for LLMs
-# repo2txt
