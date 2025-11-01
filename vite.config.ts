@@ -61,6 +61,7 @@ export default defineConfig(({ command }) => {
 					"util",
 					"stream",
 					"buffer",
+					"child_process",
 					// Внешние зависимости
 					"blessed",
 					"chalk",
