@@ -347,7 +347,8 @@ export async function startWebServer(
 				: path.join(__dirname, "../web");
 			app.use(express.static(staticPath));
 			// Catch-all route for SPA - must be last
-			app.get("/*", (_req, res) => {
+			// Use named wildcard parameter for Express 5 compatibility
+			app.get("/*path", (_req, res) => {
 				res.sendFile(path.join(staticPath, "index.html"));
 			});
 		}
@@ -362,7 +363,8 @@ export async function startWebServer(
 		}
 		app.use(express.static(staticPath));
 		// Catch-all route for SPA - must be last
-		app.get("/*", (_req, res) => {
+		// Use named wildcard parameter for Express 5 compatibility
+		app.get("/*path", (_req, res) => {
 			res.sendFile(path.join(staticPath, "index.html"));
 		});
 	}
