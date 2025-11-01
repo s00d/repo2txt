@@ -348,8 +348,14 @@ export async function startWebServer(
 			app.use(express.static(staticPath));
 			// Catch-all route for SPA - must be last
 			// Use named wildcard parameter for Express 5 compatibility
+			const indexPath = path.join(staticPath, "index.html");
 			app.get("/*path", (_req, res) => {
-				res.sendFile(path.join(staticPath, "index.html"));
+				// Only send index.html if the file actually exists
+				if (existsSync(indexPath)) {
+					res.sendFile(indexPath);
+				} else {
+					res.status(404).send("Not Found");
+				}
 			});
 		}
 	} else {
@@ -364,8 +370,14 @@ export async function startWebServer(
 		app.use(express.static(staticPath));
 		// Catch-all route for SPA - must be last
 		// Use named wildcard parameter for Express 5 compatibility
+		const indexPath = path.join(staticPath, "index.html");
 		app.get("/*path", (_req, res) => {
-			res.sendFile(path.join(staticPath, "index.html"));
+			// Only send index.html if the file actually exists
+			if (existsSync(indexPath)) {
+				res.sendFile(indexPath);
+			} else {
+				res.status(404).send("Not Found");
+			}
 		});
 	}
 
