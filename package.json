@@ -1,6 +1,6 @@
 {
 	"name": "repo2txt",
-	"version": "1.1.4",
+	"version": "1.1.5",
 	"description": "Interactive console utility to select files and folders with checkboxes and generate markdown for LLM context",
 	"type": "module",
 	"main": "./dist/index.js",

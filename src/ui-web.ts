@@ -345,16 +345,32 @@ export async function startWebServer(
 			const staticPath = existsSync(path.join(__dirname, "../dist/web"))
 				? path.join(__dirname, "../dist/web")
 				: path.join(__dirname, "../web");
-			app.use(express.static(staticPath));
+			// Serve static files - let 404 fall through to catch-all route
+			app.use(express.static(staticPath, { fallthrough: true }));
 			// Catch-all route for SPA - must be last
-			// Use named wildcard parameter for Express 5 compatibility
-			const indexPath = path.join(staticPath, "index.html");
-			app.get("/*path", (_req, res) => {
-				// Only send index.html if the file actually exists
+			// This only fires if static middleware didn't find a file (404)
+			const indexPath = path.resolve(staticPath, "index.html");
+			app.use((req, res, next) => {
+				// Only handle GET requests that aren't API routes
+				if (req.method !== "GET" || req.path.startsWith("/api")) {
+					return next();
+				}
+				// Check if index.html exists before sending
 				if (existsSync(indexPath)) {
-					res.sendFile(indexPath);
+					// Only send if response hasn't been sent yet
+					if (!res.headersSent) {
+						res.sendFile(indexPath, (err) => {
+							if (err && !res.headersSent) {
+								console.error("Failed to send index.html:", err);
+								next(err);
+							}
+						});
+					}
 				} else {
-					res.status(404).send("Not Found");
+					if (!res.headersSent) {
+						console.error(`index.html not found at: ${indexPath}`);
+						res.status(404).send("Not Found");
+					}
 				}
 			});
 		}
@@ -367,16 +383,33 @@ export async function startWebServer(
 			);
 			process.exit(1);
 		}
-		app.use(express.static(staticPath));
+		// Serve static files - let 404 fall through to catch-all route
+		app.use(express.static(staticPath, { fallthrough: true }));
 		// Catch-all route for SPA - must be last
 		// Use named wildcard parameter for Express 5 compatibility
-		const indexPath = path.join(staticPath, "index.html");
-		app.get("/*path", (_req, res) => {
-			// Only send index.html if the file actually exists
+		// This only fires if static middleware didn't find a file (404)
+		const indexPath = path.resolve(staticPath, "index.html");
+		app.use((req, res, next) => {
+			// Only handle GET requests that aren't API routes
+			if (req.method !== "GET" || req.path.startsWith("/api")) {
+				return next();
+			}
+			// Check if index.html exists before sending
 			if (existsSync(indexPath)) {
-				res.sendFile(indexPath);
+				// Only send if response hasn't been sent yet
+				if (!res.headersSent) {
+					res.sendFile(indexPath, (err) => {
+						if (err && !res.headersSent) {
+							console.error("Failed to send index.html:", err);
+							next(err);
+						}
+					});
+				}
 			} else {
-				res.status(404).send("Not Found");
+				if (!res.headersSent) {
+					console.error(`index.html not found at: ${indexPath}`);
+					res.status(404).send("Not Found");
+				}
 			}
 		});
 	}
