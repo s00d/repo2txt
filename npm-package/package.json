@@ -1,0 +1,47 @@
+{
+  "name": "repo2txt",
+  "version": "2.0.0",
+  "description": "Convert repo to text for LLM context (Binary Wrapper)",
+  "author": "s00d",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/s00d/repo2txt.git"
+  },
+  "repo2txt": {
+    "owner": "s00d",
+    "repo": "repo2txt",
+    "version": "2.0.0"
+  },
+  "bin": {
+    "repo2txt": "./bin/run.js"
+  },
+  "scripts": {
+    "postinstall": "node ./install.js"
+  },
+  "keywords": [
+    "repository",
+    "markdown",
+    "code-analysis",
+    "token-counting",
+    "cli"
+  ],
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "files": [
+    "bin",
+    "install.js",
+    "README.md"
+  ]
+}
+

@@ -1,0 +1,6 @@
+node_modules/
+bin/repo2txt
+bin/repo2txt.exe
+*.log
+.DS_Store
+
