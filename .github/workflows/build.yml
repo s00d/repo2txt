@@ -158,11 +158,26 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "tag=v$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Create tag if not exists
+        if: always()
+        run: |
+          TAG="${{ steps.get_version.outputs.tag }}"
+          if ! git ls-remote --tags origin "$TAG" | grep -q "$TAG"; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag "$TAG" || true
+            git push origin "$TAG" || true
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Upload archives to release
         if: always()
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.get_version.outputs.tag }}
+          name: Release ${{ steps.get_version.outputs.tag }}
+          draft: true
           files: |
             repo2txt_*.tar.gz
             repo2txt_*.zip
