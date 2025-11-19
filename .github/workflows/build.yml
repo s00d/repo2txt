@@ -95,7 +95,9 @@ jobs:
           includeDebug: false
           includeRelease: true
 
-      - name: Create archives for npm package
+      - name: Create archives for npm package (Unix)
+        if: matrix.os != 'windows'
+        shell: bash
         run: |
           VERSION=$(grep -E '^version = ' src-tauri/Cargo.toml | cut -d'"' -f2)
           
@@ -132,24 +134,27 @@ jobs:
               tar -czf "../repo2txt_${VERSION}_${TARGET}.tar.gz" repo2txt
               cd ..
             fi
-          elif [ "${{ matrix.os }}" == "windows" ]; then
-            # Windows: бинарник в target/release
-            if [ -n "${{ matrix.args }}" ] && [[ "${{ matrix.args }}" == *"i686"* ]]; then
-              TARGET="i686-pc-windows-msvc"
-              BINARY="src-tauri/target/i686-pc-windows-msvc/release/repo2txt.exe"
-            else
-              TARGET="x86_64-pc-windows-msvc"
-              BINARY="src-tauri/target/release/repo2txt.exe"
-            fi
-            if [ -f "$BINARY" ]; then
-              mkdir -p dist-archive
-              cp "$BINARY" dist-archive/repo2txt.exe
-              cd dist-archive
-              zip -r "../repo2txt_${VERSION}_${TARGET}.zip" repo2txt.exe
-              cd ..
-            fi
           fi
-        shell: bash
+
+      - name: Create archives for npm package (Windows)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          $VERSION = (Select-String -Path "src-tauri/Cargo.toml" -Pattern '^version = "(.+)"' | ForEach-Object { $_.Matches.Groups[1].Value })
+          
+          if ("${{ matrix.args }}" -match "i686") {
+            $TARGET = "i686-pc-windows-msvc"
+            $BINARY = "src-tauri/target/i686-pc-windows-msvc/release/repo2txt.exe"
+          } else {
+            $TARGET = "x86_64-pc-windows-msvc"
+            $BINARY = "src-tauri/target/release/repo2txt.exe"
+          }
+          
+          if (Test-Path $BINARY) {
+            New-Item -ItemType Directory -Force -Path "dist-archive" | Out-Null
+            Copy-Item $BINARY "dist-archive/repo2txt.exe"
+            Compress-Archive -Path "dist-archive/repo2txt.exe" -DestinationPath "repo2txt_${VERSION}_${TARGET}.zip" -Force
+          }
 
       - name: Get version
         id: get_version
