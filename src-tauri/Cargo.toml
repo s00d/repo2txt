@@ -1,0 +1,47 @@
+[package]
+name = "repo2txt"
+version = "2.0.0"
+description = "A Tauri App"
+authors = ["you"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "repo2txt_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-store = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Работа с файлами и gitignore (замена walkdir для лучшей производительности)
+ignore = "0.4"
+
+# Токенизатор (аналог gpt-tokenizer, но быстрее)
+tiktoken-rs = "0.5"
+
+# Асинхронность
+tokio = { version = "1", features = ["full"] }
+
+# Для уникальных ID узлов
+uuid = { version = "1", features = ["v4"] }
+
+# Логирование
+log = "0.4"
+env_logger = "0.11"
+
+# Параллельная обработка
+futures = "0.3"
+

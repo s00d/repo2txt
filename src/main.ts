@@ -1,6 +1,11 @@
-#!/usr/bin/env node
+import { createApp } from "vue";
+import { createPinia } from "pinia";
+import App from "./App.vue";
+import "./style.css";
 
-import { runMain } from "citty";
-import { main } from "./index.js";
+// Подключаем стиль подсветки кода (светлая тема)
+import "highlight.js/styles/github.css";
 
-runMain(main);
+const app = createApp(App);
+app.use(createPinia());
+app.mount("#app");

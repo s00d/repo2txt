@@ -1,86 +1,33 @@
 import { defineConfig } from "vite";
-import { resolve } from "path";
-import dts from "vite-plugin-dts";
-import react from "@vitejs/plugin-react";
+import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
 
-export default defineConfig(({ command }) => {
-	// Если BUILD_WEB === "true", собираем web UI
-	if (process.env.BUILD_WEB === "true") {
-		return {
-			plugins: [react(), tailwindcss()],
-			root: "web",
-			build: {
-				outDir: "../dist/web",
-				emptyOutDir: true,
-			},
-			resolve: {
-				alias: {
-					"@": resolve(__dirname, "./src"),
-				},
-			},
-			esbuild: {
-				jsx: "automatic",
-			},
-		};
-	}
+// @ts-expect-error process is a nodejs global
+const host = process.env.TAURI_DEV_HOST;
 
-	// Обычная сборка для CLI
-	return {
-		plugins: [
-			dts({
-				include: ["src/**/*"],
-				exclude: ["src/**/*.test.ts", "src/**/*.spec.ts", "src/main.ts"],
-				outDir: "dist",
-				rollupTypes: false,
-				copyDtsFiles: true,
-				insertTypesEntry: false,
-			}),
-		],
-		build: {
-			target: "es2022",
-			outDir: "dist",
-			lib: {
-				entry: {
-					main: resolve(__dirname, "src/main.ts"),
-					index: resolve(__dirname, "src/index.ts"),
-				},
-				formats: ["es"],
-				fileName: (_format, entryName) => `${entryName}.js`,
-			},
-			rollupOptions: {
-				external: [
-					// Node.js встроенные модули
-					/^node:/,
-					"fs",
-					"fs/promises",
-					"path",
-					"url",
-					"events",
-					"os",
-					"util",
-					"stream",
-					"buffer",
-					"child_process",
-					// Внешние зависимости
-					"blessed",
-					"chalk",
-					"citty",
-					"ignore",
-					"clipboardy",
-					"gpt-tokenizer",
-					"express",
-					"electron",
-					"vite",
-				],
-				output: {
-					preserveModules: true,
-					entryFileNames: "[name].js",
-					// Shebang уже есть в исходном файле main.ts, Vite сохранит его
-				},
-			},
-			minify: false,
-			sourcemap: true,
-		},
-	};
-});
+// https://vite.dev/config/
+export default defineConfig(async () => ({
+  plugins: [vue(), tailwindcss()],
+
+  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
+  //
+  // 1. prevent Vite from obscuring rust errors
+  clearScreen: false,
+  // 2. tauri expects a fixed port, fail if that port is not available
+  server: {
+    port: 1420,
+    strictPort: true,
+    host: host || false,
+    hmr: host
+      ? {
+          protocol: "ws",
+          host,
+          port: 1421,
+        }
+      : undefined,
+    watch: {
+      // 3. tell Vite to ignore watching `src-tauri`
+      ignored: ["**/src-tauri/**"],
+    },
+  },
+}));
