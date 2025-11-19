@@ -1,14 +1,15 @@
 {
   "name": "repo2txt",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.0.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "type-check": "vue-tsc --noEmit",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "version:update": "node scripts/update-version.cjs"
   },
   "dependencies": {
     "@tanstack/vue-virtual": "^3.13.12",

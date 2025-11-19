@@ -83,7 +83,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: app-v__VERSION__ # the action automatically replaces __VERSION__ with the app version.
+          tagName: v__VERSION__ # the action automatically replaces __VERSION__ with the app version.
           appName: 'repo2txt_${{ matrix.os }}'
           releaseName: 'Release v__VERSION__'
           releaseBody: 'See the assets to download this version and install.'
@@ -94,3 +94,77 @@ jobs:
           updaterJsonPreferNsis: true
           includeDebug: false
           includeRelease: true
+
+      - name: Create archives for npm package
+        run: |
+          VERSION=$(grep -E '^version = ' src-tauri/Cargo.toml | cut -d'"' -f2)
+          
+          if [ "${{ matrix.os }}" == "macos" ]; then
+            # macOS: извлекаем бинарник из .app бандла (universal build содержит оба архитектуры)
+            APP_BUNDLE=$(find src-tauri/target -name "*.app" -type d | head -1)
+            if [ -z "$APP_BUNDLE" ]; then
+              APP_BUNDLE=$(find src-tauri/target -name "repo2txt.app" -type d | head -1)
+            fi
+            if [ -n "$APP_BUNDLE" ]; then
+              BINARY="$APP_BUNDLE/Contents/MacOS/repo2txt"
+              if [ -f "$BINARY" ]; then
+                # Создаем архив для universal (можно использовать для обеих архитектур)
+                mkdir -p dist-archive
+                cp "$BINARY" dist-archive/repo2txt
+                chmod +x dist-archive/repo2txt
+                cd dist-archive
+                tar -czf "../repo2txt_${VERSION}_universal-apple-darwin.tar.gz" repo2txt
+                # Также создаем для конкретных архитектур (npm-package может использовать universal)
+                tar -czf "../repo2txt_${VERSION}_x86_64-apple-darwin.tar.gz" repo2txt
+                tar -czf "../repo2txt_${VERSION}_aarch64-apple-darwin.tar.gz" repo2txt
+                cd ..
+              fi
+            fi
+          elif [ "${{ matrix.os }}" == "linux" ]; then
+            # Linux: бинарник в target/release
+            TARGET="x86_64-unknown-linux-gnu"
+            BINARY="src-tauri/target/release/repo2txt"
+            if [ -f "$BINARY" ]; then
+              mkdir -p dist-archive
+              cp "$BINARY" dist-archive/repo2txt
+              chmod +x dist-archive/repo2txt
+              cd dist-archive
+              tar -czf "../repo2txt_${VERSION}_${TARGET}.tar.gz" repo2txt
+              cd ..
+            fi
+          elif [ "${{ matrix.os }}" == "windows" ]; then
+            # Windows: бинарник в target/release
+            if [ -n "${{ matrix.args }}" ] && [[ "${{ matrix.args }}" == *"i686"* ]]; then
+              TARGET="i686-pc-windows-msvc"
+              BINARY="src-tauri/target/i686-pc-windows-msvc/release/repo2txt.exe"
+            else
+              TARGET="x86_64-pc-windows-msvc"
+              BINARY="src-tauri/target/release/repo2txt.exe"
+            fi
+            if [ -f "$BINARY" ]; then
+              mkdir -p dist-archive
+              cp "$BINARY" dist-archive/repo2txt.exe
+              cd dist-archive
+              zip -r "../repo2txt_${VERSION}_${TARGET}.zip" repo2txt.exe
+              cd ..
+            fi
+          fi
+        shell: bash
+
+      - name: Get version
+        id: get_version
+        run: |
+          VERSION=$(grep -E '^version = ' src-tauri/Cargo.toml | cut -d'"' -f2)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Upload archives to release
+        if: always()
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.get_version.outputs.tag }}
+          files: |
+            repo2txt_*.tar.gz
+            repo2txt_*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -12,7 +12,7 @@ const config = packageJson.repo2txt || {};
 // НАСТРОЙКИ
 const OWNER = process.env.REPO2TXT_OWNER || config.owner || 's00d';
 const REPO = process.env.REPO2TXT_REPO || config.repo || 'repo2txt';
-const VERSION = process.env.REPO2TXT_VERSION || config.version || packageJson.version || '2.0.0';
+const VERSION = process.env.REPO2TXT_VERSION || config.version || packageJson.version || '2.0.2';
 const GPG_KEY_ID = process.env.REPO2TXT_GPG_KEY_ID || config.gpgKeyId || null; // Опционально: ID ключа для проверки
 const BIN_DIR = path.join(__dirname, 'bin');
 const BIN_NAME = process.platform === 'win32' ? 'repo2txt.exe' : 'repo2txt';
@@ -46,7 +46,7 @@ function getTarget() {
 function getDownloadUrl(target, isSignature = false) {
     // Формат имени файла в релизах.
     // Если вы используете tauri-action или стандартные rust actions, обычно это tar.gz или zip
-    // Пример: repo2txt_2.0.0_x86_64-apple-darwin.tar.gz
+    // Пример: repo2txt_2.0.2_x86_64-apple-darwin.tar.gz
     const ext = process.platform === 'win32' ? 'zip' : 'tar.gz';
     const sigExt = isSignature ? '.sig' : '';
     const filename = `repo2txt_${VERSION}_${target}.${ext}${sigExt}`;
