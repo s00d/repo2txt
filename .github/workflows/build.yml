@@ -153,6 +153,7 @@ jobs:
 
       - name: Get version
         id: get_version
+        shell: bash
         run: |
           VERSION=$(grep -E '^version = ' src-tauri/Cargo.toml | cut -d'"' -f2)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
@@ -160,6 +161,7 @@ jobs:
 
       - name: Create tag if not exists
         if: always()
+        shell: bash
         run: |
           TAG="${{ steps.get_version.outputs.tag }}"
           if ! git ls-remote --tags origin "$TAG" | grep -q "$TAG"; then
