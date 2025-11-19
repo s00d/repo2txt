@@ -104,12 +104,12 @@ codesign --force --deep --sign - /Applications/repo2txt
 
 ## ⌨️ Keyboard Shortcuts
 
-| Key | Action |
-|-----|--------|
-| ↑ / ↓ | Navigate through the file tree |
+| Key   | Action                               |
+|-------|--------------------------------------|
+| ↑ / ↓ | Navigate through the file tree       |
 | Space | Toggle selection of the focused item |
-| Enter | Expand folder / Preview file |
-| → / ← | Expand / Collapse folder |
+| Enter | Expand folder / Preview file         |
+| → / ← | Expand / Collapse folder             |
 
 ## ⚙️ Configuration
 
@@ -190,33 +190,6 @@ pnpm tauri dev
 ```bash
 # Build for production
 pnpm tauri build
-```
-
-## NPM Wrapper Scripts
-
-If you want to publish your own wrapper, here is the structure used in `npm-package/`:
-
-**package.json:**
-
-```json
-{
-  "name": "repo2txt",
-    "version": "2.0.0",
-  "bin": {
-    "repo2txt": "./bin/run.js"
-  },
-  "scripts": {
-    "postinstall": "node ./install.js"
-  }
-}
-```
-
-**install.js (Simplified):**
-
-```javascript
-const { platform, arch } = process;
-// Logic to detect OS and download binary from GitHub Releases
-// saves it to ./bin/repo2txt(.exe)
 ```
 
 ## 📄 License
