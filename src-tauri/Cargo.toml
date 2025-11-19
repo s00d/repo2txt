@@ -1,6 +1,6 @@
 [package]
 name = "repo2txt"
-version = "2.0.2"
+version = "2.0.3"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -30,7 +30,7 @@ serde_json = "1"
 ignore = "0.4"
 
 # Токенизатор (аналог gpt-tokenizer, но быстрее)
-tiktoken-rs = "0.5"
+tiktoken-rs = "0.9.1"
 
 # Асинхронность
 tokio = { version = "1", features = ["full"] }

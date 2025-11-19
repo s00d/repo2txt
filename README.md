@@ -10,7 +10,17 @@ A high-performance desktop application for preparing code context for LLMs (Chat
 
 Built with **Rust (Tauri)** and **Vue 3** for blazing fast performance even on massive monorepos.
 
-![repo2txt screenshot](https://github.com/s00d/repo2txt/raw/main/assets/screenshot.png)
+## 📸 Screenshots
+
+![repo2txt interface](https://github.com/s00d/repo2txt/raw/main/assets/img1.png)
+
+![File tree and preview](https://github.com/s00d/repo2txt/raw/main/assets/img2.png)
+
+![Settings modal](https://github.com/s00d/repo2txt/raw/main/assets/img3.png)
+
+![Generation result](https://github.com/s00d/repo2txt/raw/main/assets/img4.png)
+
+![Dark mode](https://github.com/s00d/repo2txt/raw/main/assets/img5.png)
 
 ## ✨ Features
 

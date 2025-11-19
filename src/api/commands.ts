@@ -42,6 +42,7 @@ export interface GenerateResult {
 // Параметры для команд
 export interface AppConfig {
   ignored_names: string[];
+  ignored_folders: string[];
   binary_extensions: string[];
   token_limit?: number; // Опционально для обратной совместимости
   max_file_size?: number;

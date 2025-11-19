@@ -3,7 +3,8 @@ use std::collections::HashSet;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
-    pub ignored_names: HashSet<String>, // Папки и файлы (.git, node_modules)
+    pub ignored_names: HashSet<String>, // Имена файлов для игнора
+    pub ignored_folders: HashSet<String>, // Имена папок для игнора
     pub binary_extensions: HashSet<String>, // Расширения (png, exe)
     #[serde(default = "default_token_limit")]
     pub token_limit: usize, // Лимит токенов для визуального предупреждения
@@ -39,12 +40,25 @@ fn default_output_filename() -> String {
 
 impl Default for AppConfig {
     fn default() -> Self {
-        let ignored = vec![
+        // Игнорируемые файлы (не папки)
+        let ignored_files = vec![
+            ".DS_Store",
+            "Thumbs.db",
+            "Gemfile.lock",
+            "go.sum",
+            "go.work.sum",
+            "yarn.lock",
+            "pnpm-lock.yaml",
+            "composer.lock",
+            "package-lock.json",
+            "Cargo.lock",
+        ];
+
+        // Игнорируемые папки
+        let ignored_folders = vec![
             ".git",
             ".svn",
             ".hg",
-            ".DS_Store",
-            "Thumbs.db",
             ".idea",
             ".vscode",
             ".vs",
@@ -76,25 +90,17 @@ impl Default for AppConfig {
             "venv",
             ".venv",
             "env",
-            ".env.local",
             "bundler",
             "vendor",
-            "Gemfile.lock",
             ".bundle",
             "checkouts",
             ".cargo",
             ".rustup",
-            "go.sum",
-            "go.work.sum",
             ".gradle",
-            "build",
             ".settings",
             ".classpath",
             ".project",
-            "bin",
-            "obj",
             "Properties",
-            ".vs",
             "_build",
             "deps",
             "_opam",
@@ -103,19 +109,6 @@ impl Default for AppConfig {
             "htmlcov",
             "coverage",
             ".nyc_output",
-            "*.lock",
-            "yarn.lock",
-            "pnpm-lock.yaml",
-            "composer.lock",
-            "package-lock.json",
-            "Cargo.lock",
-            "*.log",
-            "*.tlog",
-            "*.tmp",
-            "*.temp",
-            "*.bak",
-            "*.swp",
-            "*.swo",
         ];
 
         let binary = vec![
@@ -198,7 +191,8 @@ impl Default for AppConfig {
         ];
 
         Self {
-            ignored_names: ignored.into_iter().map(String::from).collect(),
+            ignored_names: ignored_files.into_iter().map(String::from).collect(),
+            ignored_folders: ignored_folders.into_iter().map(String::from).collect(),
             binary_extensions: binary.into_iter().map(String::from).collect(),
             token_limit: default_token_limit(),
             max_file_size: default_max_file_size(),

@@ -233,13 +233,35 @@ pub async fn open_directory(
                     .and_then(|n| n.to_str())
                     .unwrap_or("");
 
-                // Проверка по конфигу (вместо констант)
-                if app_config_clone.ignored_names.contains(name) {
+                // Получаем только тип файла, без размера (file_type быстрее metadata)
+                let is_directory = entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
+
+                // Проверка пути на игнорируемые папки (например, .git в любом месте)
+                let relative_path_str = entry_path
+                    .strip_prefix(&root_path_buf)
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|_| entry_path.to_string_lossy().to_string());
+                
+                // Проверяем, содержит ли путь игнорируемые папки
+                // В Rust пути всегда используют '/' в строковом представлении
+                let should_ignore_folder = relative_path_str
+                    .split('/')
+                    .any(|component| app_config_clone.ignored_folders.contains(component));
+                
+                if should_ignore_folder {
                     continue;
                 }
 
-                // Получаем только тип файла, без размера (file_type быстрее metadata)
-                let is_directory = entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false);
+                // Проверка по конфигу - для папок используем ignored_folders, для файлов - ignored_names
+                if is_directory {
+                    if app_config_clone.ignored_folders.contains(name) {
+                        continue;
+                    }
+                } else {
+                    if app_config_clone.ignored_names.contains(name) {
+                        continue;
+                    }
+                }
 
                 if !is_directory {
                     // Проверка расширения по конфигу
@@ -374,6 +396,12 @@ async fn analyze_files_background(
                     { state_inner.current_scan_id.lock().map(|g| *g).unwrap_or(0) };
                 if current_scan_id != scan_id {
                     log::debug!("Scan {} cancelled, skipping file {}", scan_id, id);
+                    return None;
+                }
+
+                // Дополнительная проверка: пропускаем файлы из игнорируемых папок
+                // (на случай, если они все же попали в список)
+                if id.split('/').any(|component| component == ".git" || component == "node_modules") {
                     return None;
                 }
 
@@ -553,17 +581,39 @@ pub async fn scan_directory(
                     .and_then(|n| n.to_str())
                     .unwrap_or("");
 
-                // Проверка по конфигу
-                if app_config.ignored_names.contains(name) {
-                    continue;
-                }
-
                 let metadata = match entry.metadata() {
                     Ok(m) => m,
                     Err(_) => continue,
                 };
 
                 let is_directory = metadata.is_dir();
+
+                // Проверка пути на игнорируемые папки
+                let relative_path_str = entry_path
+                    .strip_prefix(Path::new(&root))
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|_| entry_path.to_string_lossy().to_string());
+                
+                // Проверяем, содержит ли путь игнорируемые папки
+                // В Rust пути всегда используют '/' в строковом представлении
+                let should_ignore_folder = relative_path_str
+                    .split('/')
+                    .any(|component| app_config.ignored_folders.contains(component));
+                
+                if should_ignore_folder {
+                    continue;
+                }
+
+                // Проверка по конфигу - для папок используем ignored_folders, для файлов - ignored_names
+                if is_directory {
+                    if app_config.ignored_folders.contains(name) {
+                        continue;
+                    }
+                } else {
+                    if app_config.ignored_names.contains(name) {
+                        continue;
+                    }
+                }
 
                 if !is_directory {
                     // Проверка расширения по конфигу

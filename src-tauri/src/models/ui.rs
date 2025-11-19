@@ -93,8 +93,14 @@ pub fn get_app_settings_schema() -> Vec<SettingSection> {
             fields: vec![
                 SettingField {
                     key: "ignored_names".to_string(),
-                    label: "Ignored Files & Folders".to_string(),
-                    description: Some("Exact match for files and folders to skip.".to_string()),
+                    label: "Ignored Files".to_string(),
+                    description: Some("Exact match for file names to skip.".to_string()),
+                    component: SettingType::Tags,
+                },
+                SettingField {
+                    key: "ignored_folders".to_string(),
+                    label: "Ignored Folders".to_string(),
+                    description: Some("Exact match for folder names to skip.".to_string()),
                     component: SettingType::Tags,
                 },
                 SettingField {

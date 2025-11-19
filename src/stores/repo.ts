@@ -7,44 +7,6 @@ import { commands, type FileNode, type AppStats, type GenerateResult, type FileU
 // Re-export типы для обратной совместимости
 export type { FileNode, AppStats, GenerateResult, AppConfig };
 
-// Значения по умолчанию
-const DEFAULT_CONFIG: AppConfig = {
-  ignored_names: [
-    ".git", ".svn", ".hg", ".DS_Store", "Thumbs.db", ".idea", ".vscode", ".vs", ".history",
-    "node_modules", "bower_components", "jspm_packages", "web_modules",
-    "dist", "build", "out", "target", "bin", "obj", "release", "debug", "pkg",
-    ".next", ".nuxt", ".cache", ".parcel-cache", ".turbo", ".vercel", ".output",
-    "__pycache__", ".pytest_cache", ".mypy_cache", ".tox", "venv", ".venv", "env", ".env.local",
-    "bundler", "vendor", "Gemfile.lock", ".bundle",
-    "checkouts", ".cargo", ".rustup",
-    "go.sum", "go.work.sum",
-    ".gradle", "build", ".settings", ".classpath", ".project",
-    "bin", "obj", "Properties", ".vs",
-    "_build", "deps", "_opam",
-    "storage", "bootstrap/cache",
-    "htmlcov", "coverage", ".nyc_output",
-    "*.lock", "yarn.lock", "pnpm-lock.yaml", "composer.lock", "package-lock.json", "Cargo.lock",
-    "*.log", "*.tlog", "*.tmp", "*.temp", "*.bak", "*.swp", "*.swo",
-  ],
-  binary_extensions: [
-    "png", "jpg", "jpeg", "gif", "bmp", "ico", "svg", "webp", "tiff", "tif", "psd", "ai", "eps",
-    "mp4", "avi", "mov", "wmv", "flv", "mkv", "webm", "3gp",
-    "mp3", "wav", "flac", "aac", "ogg", "wma", "m4a",
-    "zip", "rar", "7z", "tar", "gz", "bz2", "xz", "iso", "dmg", "pkg", "deb", "rpm",
-    "exe", "dll", "so", "dylib", "bin", "msi", "msu",
-    "ttf", "otf", "woff", "woff2", "eot",
-    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods",
-    "sqlite", "db", "db3", "mdb", "accdb",
-    "pyc", "pyo", "pyd", "class", "jar", "war", "ear",
-    "ds_store", "thumbs.db",
-  ],
-  token_limit: 128000,
-  max_file_size: 1024 * 1024, // 1 MB
-  output_template: "## {{path}}\n\n```{{language}}\n{{content}}\n```\n\n---\n\n",
-  theme: 'system' as const,
-  output_filename: 'output.md',
-};
-
 // Инициализация стора (settings.json создастся в AppData)
 const settingsStore = new LazyStore('settings.json');
 
@@ -70,7 +32,16 @@ export const useRepoStore = defineStore('repo', {
     searchQuery: '', // Поисковый запрос
     searchResults: [] as string[], // ID найденных узлов
     focusedNodeId: null as string | null, // ID сфокусированного узла для клавиатурной навигации
-    config: JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as AppConfig,
+    config: {
+      ignored_names: [],
+      ignored_folders: [],
+      binary_extensions: [],
+      token_limit: 128000,
+      max_file_size: 1024 * 1024,
+      output_template: "## {{path}}\n\n```{{language}}\n{{content}}\n```\n\n---\n\n",
+      theme: 'system',
+      output_filename: 'output.md',
+    } as AppConfig,
   }),
 
   getters: {
@@ -163,35 +134,56 @@ export const useRepoStore = defineStore('repo', {
   actions: {
     async loadSettings() {
       try {
+        const defaultConfig = await commands.getDefaultConfig();
         const savedConfig = await settingsStore.get<AppConfig>('app_config');
         if (savedConfig) {
           // Убеждаемся, что все новые поля есть (для обратной совместимости)
           if (savedConfig.token_limit === undefined) {
-            savedConfig.token_limit = 128000;
+            savedConfig.token_limit = defaultConfig.token_limit;
           }
           if (savedConfig.max_file_size === undefined) {
-            savedConfig.max_file_size = 1024 * 1024;
+            savedConfig.max_file_size = defaultConfig.max_file_size;
           }
           if (!savedConfig.output_template) {
-            savedConfig.output_template = "## {{path}}\n\n```{{language}}\n{{content}}\n```\n\n---\n\n";
+            savedConfig.output_template = defaultConfig.output_template;
           }
-                  if (!savedConfig.theme) {
-                    savedConfig.theme = 'system';
-                  }
-                  if (!savedConfig.output_filename) {
-                    savedConfig.output_filename = 'output.md';
-                  }
-                  this.config = savedConfig;
+          if (!savedConfig.theme) {
+            savedConfig.theme = defaultConfig.theme;
+          }
+          if (!savedConfig.output_filename) {
+            savedConfig.output_filename = defaultConfig.output_filename;
+          }
+          // Обратная совместимость: если ignored_folders нет, используем дефолтные значения
+          if (!savedConfig.ignored_folders || savedConfig.ignored_folders.length === 0) {
+            savedConfig.ignored_folders = [...defaultConfig.ignored_folders];
+          }
+          this.config = savedConfig;
           // Применяем тему
           this.applyTheme();
         } else {
           // Если файла нет, сохраняем дефолт
-          await this.saveSettings(DEFAULT_CONFIG);
+          await this.saveSettings(defaultConfig);
         }
       } catch (error) {
         console.error('Failed to load settings:', error);
         // Fallback to default
-        this.config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+        try {
+          const defaultConfig = await commands.getDefaultConfig();
+          this.config = defaultConfig;
+        } catch (e) {
+          console.error('Failed to get default config:', e);
+          // Последний fallback - минимальный конфиг
+          this.config = {
+            ignored_names: [],
+            ignored_folders: [],
+            binary_extensions: [],
+            token_limit: 128000,
+            max_file_size: 1024 * 1024,
+            output_template: "## {{path}}\n\n```{{language}}\n{{content}}\n```\n\n---\n\n",
+            theme: 'system',
+            output_filename: 'output.md',
+          };
+        }
         this.applyTheme();
       }
     },
