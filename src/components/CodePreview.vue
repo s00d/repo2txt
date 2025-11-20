@@ -13,12 +13,20 @@
     </div>
 
     <!-- Код -->
-    <div class="flex-1 py-4 px-4 min-w-0 overflow-auto h-full">
+    <div 
+      ref="codeContainer"
+      class="flex-1 py-4 px-4 min-w-0 overflow-auto h-full focus:outline-none"
+      @keydown.ctrl.a.prevent="handleSelectAll"
+      @keydown.meta.a.prevent="handleSelectAll"
+      @click="handleFocus"
+      tabindex="0"
+    >
       <!-- 
          text-slate-800 dark:text-slate-200: базовый цвет текста, если highlight не сработал
          !bg-transparent: чтобы фон highlight.js не перекрывал наш фон
       -->
       <pre><code 
+        ref="codeElement"
         class="font-mono text-[12px] leading-5 !bg-transparent !p-0 block w-full text-slate-800 dark:text-slate-200"
         :class="`language-${language || detectedLanguage}`"
         v-html="highlightedCode"
@@ -28,7 +36,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import hljs from 'highlight.js/lib/common';
 
 const props = defineProps<{
@@ -37,10 +45,37 @@ const props = defineProps<{
   filePath?: string;
 }>();
 
+const codeElement = ref<HTMLElement | null>(null);
+const codeContainer = ref<HTMLElement | null>(null);
+
 const lineCount = computed(() => {
   if (!props.content) return 0;
   return props.content.split('\n').length;
 });
+
+const handleFocus = () => {
+  // Устанавливаем фокус на контейнер при клике, чтобы обработчик Ctrl+A работал
+  if (codeContainer.value) {
+    codeContainer.value.focus();
+  }
+};
+
+const handleSelectAll = (event: KeyboardEvent) => {
+  event.preventDefault();
+  event.stopPropagation();
+  
+  if (!codeElement.value) return;
+  
+  // Выделяем всё содержимое code элемента
+  const range = document.createRange();
+  range.selectNodeContents(codeElement.value);
+  
+  const selection = window.getSelection();
+  if (selection) {
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+};
 
 const detectedLanguage = computed(() => {
   if (props.language) return props.language;

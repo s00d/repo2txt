@@ -143,7 +143,7 @@
       :title="modalContent?.success ? 'Generation Complete' : 'Error'"
     >
       <!-- ВАЖНО: h-[80vh] задает фиксированную высоту контейнеру модалки -->
-      <div class="flex flex-col h-[80vh] w-full overflow-hidden">
+      <div class="flex flex-col h-[80vh] w-full overflow-hidden select-none">
         
         <!-- Статус (Header) -->
         <div class="px-6 py-4 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-700 shrink-0">
@@ -183,7 +183,7 @@
 
           <!-- Текстовая область -->
           <!-- ВАЖНО: flex-1 и overflow-hidden для правильного скролла внутри CodePreview -->
-          <div class="flex-1 relative w-full overflow-hidden">
+          <div class="flex-1 relative w-full overflow-hidden select-text">
              <CodePreview 
                 class="absolute inset-0 w-full h-full"
                 :content="modalContent.content" 

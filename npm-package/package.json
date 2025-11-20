@@ -1,6 +1,6 @@
 {
   "name": "repo2txt",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "Convert repo to text for LLM context (Binary Wrapper)",
   "author": "s00d",
   "license": "MIT",
@@ -11,7 +11,7 @@
   "repo2txt": {
     "owner": "s00d",
     "repo": "repo2txt",
-    "version": "2.0.3"
+    "version": "2.0.4"
   },
   "bin": {
     "repo2txt": "./bin/run.js"
